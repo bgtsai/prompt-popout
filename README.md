@@ -2,65 +2,65 @@
 
 # Prompt Popout
 
-A Tampermonkey userscript that adds a slim handle to the left of the chat input on **Claude**, **ChatGPT** and **Gemini**. Hover the handle and your saved prompts pop out; click one to insert it.
+Keep the prompts you use all the time one hover away. Prompt Popout puts a slim handle next to the chat box on Claude, ChatGPT and Gemini. Hover over it to bring up your saved prompts, then click one to drop it into the chat box.
 
 ![Prompt Popout menu](docs/img/menu.en.png)
 
 ## Features
 
-- **Handle on the input card** — the card grows a small block on its left with a pill-shaped handle. It takes the site's accent colour (orange on Claude, black on ChatGPT, blue on Gemini) while you hover or while the list is open.
-- **Pop-out list** — opens next to the handle at the height of your mouse pointer. Hover to open, or click (for touch devices).
-- **Fill-in fields** — write `[field]` in a prompt and you are asked for the value before it is inserted. On by default for new prompts.
-- **Auto-send** — optionally press send for you once the text is in.
-- **Tags** — colour-coded tags; click tags in the list to filter (a prompt must have every selected tag).
-- **Import / export** — back up or move your prompts as a JSON file.
-- **Built-in help** — short *Details* links in the editor explain fill-in fields and auto-send with examples.
-- Interface in English or Traditional Chinese, chosen automatically from your browser language.
+- **A handle by the chat box** — a narrow strip appears on the left of the chat box. When you hover over it or the list is open, it lights up in the site's own colour (orange on Claude, black on ChatGPT, blue on Gemini).
+- **Pop-out list** — the list opens right next to the handle, level with your pointer. Hover to open it, or tap on a touch screen.
+- **Fill-in blanks** — put `[blank]` in a prompt and you'll be asked what to put there before it's inserted, so you never have to hunt through the text to change a word. Turned on by default for new prompts.
+- **Auto-send** — optionally hit send for you once the text is in.
+- **Tags** — sort prompts with coloured tags and click a tag at the top of the list to show just those. Pick several and you'll only see prompts that have all of them.
+- **Import / export** — back up your prompts, or move them to another computer, as a JSON file.
+- **Built-in help** — *Details* links in the editor show, with examples, how fill-in blanks and auto-send work.
+- The interface follows your browser's language: Traditional Chinese for Chinese, English for everything else.
 
 ## Install
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/).
-2. Open this link and confirm the install: [prompt_popout.user.js](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/prompt_popout.user.js)
+2. Click here to install: [prompt_popout.user.js](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/prompt_popout.user.js)
 
-Updates are picked up automatically by Tampermonkey.
+Tampermonkey will keep it up to date from then on.
 
 ## Usage
 
-- Hover the handle on the left of the chat input to open the list; click a prompt to insert it.
-- **Manage…** at the bottom of the list (or the Tampermonkey menu → *Manage prompts*) opens the manager: add, edit, delete, reorder, tags, import and export.
-- In the editor, **New tag…** creates a tag without leaving the prompt you are editing.
+- Move your pointer onto the handle to the left of the chat box, then click a prompt to insert it.
+- **Manage…** at the bottom of the list (or *Manage prompts* in the Tampermonkey menu) is where you add, edit, delete and reorder prompts, manage tags, and import or export.
+- Need a new tag while editing a prompt? Click **New tag…**, create it, and it's ready to tick when you come back. Nothing you've typed is lost.
 
 ![Prompt editor](docs/img/editor.en.png)
 
-### Fill-in syntax
+### Writing fill-in blanks
 
-Fields are only asked for when **Use fill-in fields** is ticked for that prompt.
+The fill-in window only appears for prompts with **Use fill-in fields** ticked.
 
-| Write | Meaning |
+| Write | What you get |
 |---|---|
-| `[name]` | a field called *name* |
-| `[name::Bob]` | field with a default value |
-| `[name](who to greet)` | field with a hint shown next to it |
-| `[name::Bob](who to greet)` | both |
+| `[name]` | a blank called *name* |
+| `[name::Bob]` | a blank that starts out filled with *Bob* (you can change it) |
+| `[name](who to greet)` | a blank with the hint *who to greet* beside it |
+| `[name::Bob](who to greet)` | both together |
 
-A field name used more than once is asked only once and fills every occurrence.
+If the same name appears more than once, you're asked once and every copy gets the same answer.
 
-Example: `Translate into [language::English], [tone] tone.` → you are asked for *language* (pre-filled with English) and *tone*.
+For example, with `Translate into [language::English], [tone] tone.` you're asked for *language* (already filled with English) and *tone*.
 
-If a prompt contains square brackets that are not fields (for example a Markdown link `[text](url)`), untick **Use fill-in fields** for that prompt.
+If a prompt has square brackets that aren't meant to be blanks, such as a Markdown link `[text](url)`, just untick **Use fill-in fields** for that prompt.
 
-## Moving prompts from another tool
+## Bringing prompts over from another tool
 
-`tools/convert.html` converts a JSON export in the older `{title, text, usePlaceholders, autoExecute, tags}` array format into a file Prompt Popout can import:
+If your old tool exported a JSON file where each prompt has `title`, `text`, `usePlaceholders`, `autoExecute` and `tags`, `tools/convert.html` turns it into a file Prompt Popout can import:
 
-1. Download [convert.html](tools/convert.html) and open it in your browser (it runs entirely offline, in English or Chinese depending on your browser).
-2. Pick your export file and click **Convert & download**.
-3. In Prompt Popout open **Manage…** → **Import** and pick the downloaded file. Imported prompts are added after your existing ones; tags are matched by name.
+1. Download [convert.html](tools/convert.html) and open it in your browser. Everything happens on your computer; nothing is uploaded.
+2. Choose your export file and click **Convert & download**.
+3. In Prompt Popout, go to **Manage…** → **Import** and pick the file you just downloaded. Imported prompts are added after the ones you already have, and tags with the same name are reused.
 
 ## Notes
 
-- Tested on simulated pages in Chromium, Firefox and WebKit. The sites change their markup from time to time; if the handle disappears, please open an issue.
-- Data is stored only in Tampermonkey's local storage for this script.
+- Tested on simulated pages in Chromium, Firefox and WebKit. If a site update makes the handle disappear, please open an issue.
+- Your data stays in Tampermonkey in your own browser and is never sent anywhere.
 
 ## License
 
