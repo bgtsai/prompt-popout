@@ -34,7 +34,7 @@ Tampermonkey will keep it up to date from then on.
 
 ### Writing fill-in blanks
 
-The fill-in window only appears for prompts with **Use fill-in fields** ticked.
+The fill-in window only appears for prompts with **Use fill-in blanks** ticked.
 
 | Write | What you get |
 |---|---|
@@ -47,7 +47,7 @@ If the same name appears more than once, you're asked once and every copy gets t
 
 For example, with `Translate into [language::English], [tone] tone.` you're asked for *language* (already filled with English) and *tone*.
 
-If a prompt has square brackets that aren't meant to be blanks, such as a Markdown link `[text](url)`, just untick **Use fill-in fields** for that prompt.
+If a prompt has square brackets that aren't meant to be blanks, such as a Markdown link `[text](url)`, just untick **Use fill-in blanks** for that prompt.
 
 ## Bringing prompts over from another tool
 

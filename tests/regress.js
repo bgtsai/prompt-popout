@@ -168,7 +168,7 @@ async function runSite(engineName, browser, site) {
     __menu.find(([n]) => /管理|Manage/.test(n))[1](); await wait(80);
     btn(/^(新增|Add)$/).click(); await wait(80);
     const ed = [...document.querySelectorAll('#pp-root .pp-dialog')].pop();
-    const hint = /要先建立標籤/.test(ed.innerText);
+    const hint = /還沒有標籤/.test(ed.innerText);
     ed.querySelector('input[type=text]').value = 'keep me';
     btn(/^新增標籤…$/).click(); await wait(80);
     const tm = [...document.querySelectorAll('#pp-root .pp-dialog')].pop();
@@ -260,7 +260,7 @@ async function runSite(engineName, browser, site) {
   await page.mouse.move(hx, hy); await sleep(450);
   await page.evaluate(() => { const it = [...document.querySelectorAll('[class*=pp-] *')].find((e) => e.children.length <= 3 && /^Fill me/.test(e.innerText.trim()) && e.getBoundingClientRect().height > 20); it && it.click(); });
   await sleep(300);
-  const dlg = await page.evaluate(() => { const ta = [...document.querySelectorAll('textarea')]; return { n: ta.length, vals: ta.map((t) => t.value), text: document.body.innerText.includes('填入欄位') }; });
+  const dlg = await page.evaluate(() => { const ta = [...document.querySelectorAll('textarea')]; return { n: ta.length, vals: ta.map((t) => t.value), text: document.body.innerText.includes('填空') }; });
   check(`${tag} 填空對話框：同名只問一次 → 2 欄`, dlg.n === 2 && dlg.text, dlg);
   check(`${tag} 預設值預填`, dlg.vals[0] === 'Bob', dlg.vals);
   await page.evaluate(() => { const ta = [...document.querySelectorAll('textarea')]; ta[1].value = 'AI'; ta[1].dispatchEvent(new Event('input', { bubbles: true })); });
