@@ -2,7 +2,7 @@
 // @name               Prompt Popout
 // @name:zh-TW         Prompt Popout 提示詞快選
 // @namespace          https://github.com/bgtsai
-// @version            1.3.1
+// @version            1.4.0
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
@@ -419,13 +419,10 @@
 
   const CSS = `
 .pp-card {
-  margin-left: calc(-1 * var(--pp-w)) !important;
-  width: calc(100% + var(--pp-w)) !important;
-  max-width: none !important;
+  /* v1.4.0 起卡片不撐大：外框維持網站原本的大小與位置，把手佔卡片內最左邊 W 寬，
+     原本的內容靠加大左內距往右讓位。（v1.3.x 是 margin-left:-W＋width:100%+W 往外長出一塊）
+     不設 box-sizing：沿用網站自己的盒模型，寬度是 auto 時加內距不會撐大外框。 */
   padding-left: calc(var(--pp-w) + var(--pp-pl)) !important;
-  /* border-box：寬度 100%+W 要把加大的左內距算在裡面，右緣與文字寬度才不動。
-     網站若是 content-box（未全域設 border-box），不加這行卡片會往右多凸出「W＋左右內距」。 */
-  box-sizing: border-box !important;
 }
 .pp-card.pp-card-static { position: relative !important; }
 .pp-card::before {

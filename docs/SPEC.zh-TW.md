@@ -62,13 +62,15 @@
 - 換了卡片：舊卡片移除 class。
 - 網站（React）重繪可能把 className 整個覆蓋，所以每影格檢查，class 不見就補回。只加 class 與 inline CSS 變數，**不搬動、不包裝、不改網站元素的內容**。
 
-### 5.2 卡片撐大（從底層讓網站自己畫框）
+### 5.2 內容讓位（卡片不撐大，v1.4.0 起）
 
 令 R＝卡片左上角圓角（`getComputedStyle` 讀，四捨五入取整；讀不到用 14）。區塊寬 W＝2R。
 
-- 對卡片加 class（例如 `pp-card`），CSS：`margin-left:-W; width:calc(100% + W); max-width:none; padding-left:calc(W + 原左內距)`，全部 `!important`。效果：卡片右緣與文字位置不動，左邊長出 W 寬的一塊；**卡片的框線、陰影、圓角全由網站自己畫**，我們不畫任何外框。
+- 對卡片加 class（例如 `pp-card`），CSS 只有一條：`padding-left:calc(W + 原左內距) !important`。效果：卡片外框維持網站原本的大小與位置，把手佔卡片內最左邊 W 寬，原本的內容（輸入框、按鈕等）往右讓出 W；**卡片的框線、陰影、圓角全由網站自己畫**，我們不畫任何外框。
+- 不設 `box-sizing`、`width`、`margin`：沿用網站自己的盒模型，寬度 auto 時加內距不會撐大外框。
 - 「原左內距」與 R 必須在第一次加 class **之前**讀（加了以後讀到的是自己改過的值），存成 inline CSS 變數。
 - R 之後可每秒重讀（網站介面縮放會改圓角）。
+- v1.3.x 的舊做法是 `margin-left:-W; width:calc(100% + W); max-width:none` 讓卡片往左長出 W，把手凸在原輸入框外；使用者 2026-10-23 改為往內縮。
 
 ### 5.3 區塊（卡片 `::before`）
 

@@ -128,7 +128,12 @@ async function runSite(engineName, browser, site) {
   const W = radius * 2;
   check(`${tag} 卡片加上 pp- class`, /\bpp-/.test(cb.cls), cb.cls);
   check(`${tag} 卡片右緣不動`, Math.abs(cb.right - before.right) < 1.5, { now: cb.right, before: before.right });
-  check(`${tag} 卡片往左長出 2R=${W}px`, Math.abs((cb.right - cb.left) - (1100 - 240) - W) < 1.5, { width: cb.right - cb.left, expected: 1100 - 240 + W });
+  check(`${tag} 卡片左緣不動（不往外撐大）`, Math.abs(cb.left - 120) < 1.5, { now: cb.left, before: 120 });
+  check(`${tag} 卡片寬度不變`, Math.abs((cb.right - cb.left) - (1100 - 240)) < 1.5, { width: cb.right - cb.left, expected: 1100 - 240 });
+  const { inputLeft, bl } = await page.evaluate(() => ({
+    inputLeft: document.querySelector('[contenteditable="true"]').getBoundingClientRect().left,
+    bl: parseFloat(getComputedStyle(document.querySelector('.card')).borderLeftWidth) || 0 }));
+  check(`${tag} 輸入內容往右讓出 2R=${W}px`, Math.abs(inputLeft - (120 + bl + 16 + W)) < 1.5, { inputLeft, expected: 120 + bl + 16 + W });
   check(`${tag} 燈條寬 6px`, cb.afterW === '6px', cb.afterW);
   check(`${tag} 燈條 left=R-3`, Math.abs(parseFloat(cb.afterL) - (radius - 3)) < 0.6, cb.afterL);
   check(`${tag} 燈條 top=R-3`, Math.abs(parseFloat(cb.afterT) - (radius - 3)) < 0.6, cb.afterT);
