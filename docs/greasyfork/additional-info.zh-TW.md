@@ -1,6 +1,6 @@
 常用的提示詞存起來，要用的時候不必再複製貼上。安裝後，**Claude**、**ChatGPT**、**Gemini** 的輸入框左邊會多一條把手，滑鼠移過去就跳出你的提示詞清單，點一下就填進輸入框。
 
-![Prompt Popout 清單](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/menu.zh-TW.png)
+<img src="https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/menu.zh-TW.png" alt="Prompt Popout 清單" width="520">
 
 ## 功能
 
@@ -19,11 +19,11 @@
 
 點下去會先問「語言」（已先填好英文）和「語氣」：
 
-![填空視窗](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/fill.zh-TW.png)
+<img src="https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/fill.zh-TW.png" alt="填空視窗" width="600">
 
 輸入框拿到的是已經換好的句子：
 
-![填好後的輸入框](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/filled.zh-TW.png)
+<img src="https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/filled.zh-TW.png" alt="填好後的輸入框" width="600">
 
 | 寫法 | 效果 |
 |---|---|

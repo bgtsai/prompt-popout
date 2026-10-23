@@ -1,6 +1,6 @@
 Keep the prompts you use all the time one hover away. Prompt Popout puts a slim handle next to the chat box on **Claude**, **ChatGPT** and **Gemini**. Hover over it to bring up your saved prompts, then click one to drop it into the chat box.
 
-![Prompt Popout menu](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/menu.en.png)
+<img src="https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/menu.en.png" alt="Prompt Popout menu" width="520">
 
 ## Features
 
@@ -19,11 +19,11 @@ Translate the text below into [language::English], in a [tone](e.g. formal, casu
 
 Click it and you're asked for *language* (already filled with English) and *tone*:
 
-![Fill-in window](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/fill.en.png)
+<img src="https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/fill.en.png" alt="Fill-in window" width="600">
 
 The chat box gets the finished sentence:
 
-![Chat box after filling in](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/filled.en.png)
+<img src="https://raw.githubusercontent.com/bgtsai/prompt-popout/main/docs/img/filled.en.png" alt="Chat box after filling in" width="600">
 
 | Write | What you get |
 |---|---|
