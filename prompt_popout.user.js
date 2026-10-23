@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name               Prompt Popout
+// @name:zh-TW         Prompt Popout 提示詞快選
 // @namespace          https://github.com/bgtsai
-// @version            1.3.0
+// @version            1.3.1
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
