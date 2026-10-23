@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name               Prompt Popout
 // @namespace          https://github.com/bgtsai
-// @version            1.2.0
+// @version            1.2.1
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
@@ -132,12 +132,6 @@
           example: { label: '範例', pairs: [['總結這段對話', '勾：點了直接送出'], ['檢查錯字：', '不勾：填入後還要接著貼上文字']] },
           notes: ['送出鈕 4 秒內一直按不下去（例如還在上傳檔案）就不送，文字留在輸入框。'],
         },
-        tags: {
-          title: '標籤',
-          intro: '標籤只用來篩選彈出清單，不會被送出、不影響內容。',
-          example: { label: '範例', before: '檢查程式碼　→ 工作、程式\n寫週報　　　→ 工作', middle: '清單上方點「程式」', after: '只剩「檢查程式碼」' },
-          notes: ['同時點多個標籤＝要全部都有才顯示。', '「管理…」→「標籤…」建立標籤、改顏色；編輯提示詞時勾選。', '刪除標籤不會刪除提示詞。'],
-        },
       },
       useFill: '使用填空',
       autoSend: '填入後自動送出',
@@ -205,12 +199,6 @@
           intro: 'Presses send for you once the text is in. Prompts marked ↵ in the list do this.',
           example: { label: 'Example', pairs: [['Summarise this conversation', 'Ticked: sent straight away'], ['Fix the typos in:', 'Not ticked: you still paste the text after it']] },
           notes: ['If the send button stays disabled for 4 seconds (e.g. a file is still uploading), nothing is sent and the text stays in the box.'],
-        },
-        tags: {
-          title: 'Tags',
-          intro: 'Tags only filter the pop-out list. They are never sent and do not change the content.',
-          example: { label: 'Example', before: 'Review code   → Work, Code\nWeekly report → Work', middle: 'Click "Code" at the top of the list', after: 'Only "Review code" is left' },
-          notes: ['Several tags selected = a prompt must have all of them.', 'Create tags and set colours in Manage… → Tags…; tick them when editing a prompt.', 'Deleting a tag never deletes prompts.'],
         },
       },
       useFill: 'Use fill-in fields',
@@ -773,6 +761,14 @@
 
   // ───────────────────────── 觸發區與開關 ─────────────────────────
 
+  // 我們自己的介面（對話框、清單）蓋在把手位置上時，把手不算數：
+  // 對話框置中於視窗，輸入卡片偏右（例如側欄展開）時對話框左半部會疊在把手上，
+  // 不排除的話對話框裡的點擊會被攔下改成開關清單（v1.2.0 以前：勾選框點不動、清單在背後被打開）。
+  function ourUiBlocks(target) {
+    if (root && root.querySelector('.pp-overlay')) return true;
+    return !!(root && target instanceof Node && root.contains(target));
+  }
+
   function pointInZone(x, y) {
     const card = state.card;
     if (!card || !card.isConnected) return false;
@@ -798,7 +794,7 @@
   function onMouseMove(e) {
     state.mouseX = e.clientX;
     state.mouseY = e.clientY;
-    const now = pointInZone(e.clientX, e.clientY);
+    const now = !ourUiBlocks(e.target) && pointInZone(e.clientX, e.clientY);
     if (now === state.inZone) return;
     state.inZone = now;
     if (now) {
@@ -818,6 +814,7 @@
   function isInPopup(target) { return !!(state.popupEl && target instanceof Node && state.popupEl.contains(target)); }
 
   function onPointerDownCapture(e) {
+    if (ourUiBlocks(e.target)) return;
     if (pointInZone(e.clientX, e.clientY)) {
       // 不讓網站收到（例如把焦點移進輸入框）
       e.preventDefault();
@@ -828,7 +825,7 @@
   }
 
   function onClickCapture(e) {
-    if (!pointInZone(e.clientX, e.clientY)) return;
+    if (ourUiBlocks(e.target) || !pointInZone(e.clientX, e.clientY)) return;
     e.preventDefault();
     e.stopPropagation();
     clearOpenTimer();
@@ -1306,7 +1303,7 @@
       h('div', { class: 'pp-help', style: 'margin:0 0 6px 26px', text: T.fillNote }),
       h('div', { class: 'pp-check-row' }, h('label', { class: 'pp-check' }, sendCb, T.autoSend), helpLink('autoSend')),
       h('div', { class: 'pp-field', style: 'margin-top:10px' },
-        h('div', { class: 'pp-label-row' }, h('span', { class: 'pp-label', text: T.tagsLabel }), helpLink('tags'),
+        h('div', { class: 'pp-label-row' }, h('span', { class: 'pp-label', text: T.tagsLabel }),
           h('button', { type: 'button', class: 'pp-btn', text: T.newTagBtn, onclick: () => showTagManager(renderTagArea) })),
         tagArea));
     const save = async () => {

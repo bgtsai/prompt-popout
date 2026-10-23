@@ -178,13 +178,48 @@ async function runSite(engineName, browser, site) {
     [...tm.querySelectorAll('button')].find((b) => /^(關閉|Close)$/.test(b.innerText.trim())).click(); await wait(80);
     const after = ed.innerText;
     const res = { hint, noHelpInTagPage, tagShown: /NewTag/.test(after) && !!ed.querySelector('.pp-taglist input[type=checkbox]'), kept: ed.querySelector('input[type=text]').value, editorHelp: ed.querySelectorAll('.pp-link').length };
-    document.querySelectorAll('#pp-root .pp-overlay').forEach((o) => o.remove());
+    // 用介面上的按鈕依序關掉（直接移除 DOM 會讓腳本以為管理視窗還開著）
+    for (let i = 0; i < 4 && document.querySelector('#pp-root .pp-overlay'); i++) {
+      const top = [...document.querySelectorAll('#pp-root .pp-dialog')].pop();
+      [...top.querySelectorAll('.pp-dialog-foot button')].find((b) => /^(取消|關閉|Cancel|Close)$/.test(b.innerText.trim())).click();
+      await wait(50);
+    }
     return res;
   });
   check(`${tag} 編輯頁無標籤時提示先建立`, tagFlow.hint);
   check(`${tag} 標籤管理頁沒有詳細說明`, tagFlow.noHelpInTagPage);
   check(`${tag} 編輯頁新增標籤後直接出現且內容保留`, tagFlow.tagShown && tagFlow.kept === 'keep me', tagFlow);
-  check(`${tag} 編輯頁仍有 3 個詳細說明`, tagFlow.editorHelp === 3, tagFlow.editorHelp);
+  check(`${tag} 編輯頁有 2 個詳細說明（標籤沒有）`, tagFlow.editorHelp === 2, tagFlow.editorHelp);
+  // 對話框蓋在把手上時，對話框裡的點擊不能被把手攔走（v1.2.1 修正）
+  const sw = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    __menu.find(([n]) => /管理|Manage/.test(n))[1](); await wait(80);
+    [...document.querySelectorAll('#pp-root button')].filter((x) => x.offsetParent).reverse().find((x) => /^(新增|Add)$/.test(x.innerText.trim())).click(); await wait(80);
+    const lab = [...document.querySelectorAll('#pp-root label.pp-check')].filter((x) => x.offsetParent)[0];
+    const r = lab.getBoundingClientRect();
+    // 把卡片移到讓把手正好落在這個勾選框上
+    const card = document.querySelector('.card');
+    const c = card.getBoundingClientRect();
+    card.style.transform = `translate(${r.left + 4 - c.left - (parseFloat(getComputedStyle(card).getPropertyValue('--pp-w')) || 0) / 2}px, ${r.top + r.height / 2 - (c.top + c.height / 2)}px)`;
+    await wait(80);
+    return { x: r.left + 6, y: r.top + r.height / 2, cb: lab.querySelector('input').checked };
+  });
+  const zoneHit = await page.evaluate(([x, y]) => { const c = document.querySelector('.card').getBoundingClientRect(); return x >= c.left - 5 && x <= c.left + 40 && y >= c.top && y <= c.bottom; }, [sw.x, sw.y]);
+  await page.mouse.click(sw.x, sw.y); await sleep(400);
+  const sw2 = await page.evaluate(() => ({ cb: [...document.querySelectorAll('#pp-root label.pp-check input')].filter((x) => x.offsetParent)[0].checked, popup: !!document.querySelector('#pp-root .pp-popup') && getComputedStyle(document.querySelector('#pp-root .pp-popup')).display !== 'none' }));
+  check(`${tag} （前提）把手確實在勾選框位置`, zoneHit);
+  check(`${tag} 對話框蓋住把手時勾選框照常切換、清單不開`, sw2.cb !== sw.cb && !sw2.popup, { before: sw.cb, after: sw2 });
+  await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    // 用介面上的按鈕依序關掉（直接移除 DOM 會讓腳本以為管理視窗還開著）
+    for (let i = 0; i < 4 && document.querySelector('#pp-root .pp-overlay'); i++) {
+      const top = [...document.querySelectorAll('#pp-root .pp-dialog')].pop();
+      [...top.querySelectorAll('.pp-dialog-foot button')].find((b) => /^(取消|關閉|Cancel|Close)$/.test(b.innerText.trim())).click();
+      await wait(50);
+    }
+    document.querySelector('.card').style.transform = '';
+  });
+  await sleep(100);
   check(`${tag} 無頁面錯誤（空資料）`, errors.length === 0, errors.slice(0, 3));
   await ctx.close();
 
@@ -267,7 +302,7 @@ async function runSite(engineName, browser, site) {
     const cbs1 = [...document.querySelectorAll('#pp-root input[type=checkbox]')].map((c) => c.checked).join();
     return { out, same: cbs0 === cbs1 };
   });
-  check(`${tag} 編輯頁 3 個詳細說明都能開、含範例`, helpRes.out.length === 3 && helpRes.out.every((x) => x.hasCode), helpRes.out);
+  check(`${tag} 編輯頁 2 個詳細說明（填空、自動送出）都能開、含範例`, helpRes.out.length === 2 && helpRes.out.every((x) => x.hasCode), helpRes.out);
   check(`${tag} 點詳細說明不切換勾選`, helpRes.same);
   await page.evaluate(() => {
     const ins = [...document.querySelectorAll('input[type=text]')].filter((x) => x.offsetParent); const tas = [...document.querySelectorAll('textarea')].filter((x) => x.offsetParent);
