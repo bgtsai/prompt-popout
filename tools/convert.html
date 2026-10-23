@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt Popout 轉檔工具 / Converter</title>
+<style>
+  :root { --bg:#fafafa; --fg:#1f1f1f; --muted:#666; --card:#fff; --border:#ddd; --accent:#d97757; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1e1e1e; --fg:#eee; --muted:#aaa; --card:#2a2a2a; --border:#444; } }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:680px; margin:0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  p.note { color:var(--muted); font-size:14px; margin:0 0 16px; }
+  button { font:inherit; padding:6px 16px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.4; cursor:default; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  #out { white-space:pre-wrap; font-size:15px; }
+  .err { color:#d0302f; }
+  .tag { display:inline-block; border-radius:999px; padding:0 9px; margin:2px; font-size:13px; background:#7071fc; color:#fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Prompt Popout 轉檔工具 / Converter</h1>
+  <p class="note">把舊工具匯出的 JSON 轉成 Prompt Popout 可匯入的格式。全程在本機處理，不連網。<br>
+  Converts a JSON export from the old tool into a file Prompt Popout can import. Runs entirely offline.</p>
+  <div class="row">
+    <input type="file" id="file" accept=".json,application/json">
+    <button id="go" disabled>轉換並下載 / Convert &amp; download</button>
+  </div>
+  <div id="out"></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var DEFAULT_BG = '#7071fc';
+  var DEFAULT_FG = '#ffffff';
+  var UNTITLED = '(無標題)';
+  var fileIn = document.getElementById('file');
+  var goBtn = document.getElementById('go');
+  var out = document.getElementById('out');
+
+  function newId() {
+    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    var buf = new Uint8Array(16);
+    crypto.getRandomValues(buf);
+    return Array.prototype.map.call(buf, function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join('');
+  }
+
+  // 舊格式 → 新格式；只保留規格列出的欄位，其他（如 usageCount）捨棄
+  function convert(old) {
+    if (!Array.isArray(old)) throw new Error('檔案內容不是 JSON 陣列 / Not a JSON array');
+    var tags = [];
+    var byLower = {};
+    var prompts = [];
+    var skipped = 0;
+    old.forEach(function (item) {
+      if (!item || typeof item !== 'object' || typeof item.text !== 'string') { skipped++; return; }
+      var tagIds = [];
+      (Array.isArray(item.tags) ? item.tags : []).forEach(function (name) {
+        if (typeof name !== 'string') return;
+        var n = name.trim();
+        if (!n) return;
+        var key = n.toLowerCase(); // 不分大小寫去重
+        if (!byLower[key]) {
+          byLower[key] = { id: newId(), name: n, bg: DEFAULT_BG, fg: DEFAULT_FG };
+          tags.push(byLower[key]);
+        }
+        if (tagIds.indexOf(byLower[key].id) < 0) tagIds.push(byLower[key].id);
+      });
+      var title = typeof item.title === 'string' ? item.title.trim() : '';
+      prompts.push({
+        id: newId(),
+        title: title || UNTITLED,
+        text: item.text,
+        fill: !!item.usePlaceholders,
+        autoSend: !!item.autoExecute,
+        tagIds: tagIds
+      });
+    });
+    return { data: { format: 'prompt-popout', version: 1, tags: tags, prompts: prompts }, skipped: skipped };
+  }
+
+  function download(obj) {
+    var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'prompt-popout_import.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
+
+  // 用 DOM API 顯示結果，使用者資料一律以 textContent 寫入，免跳脫問題
+  function showResult(res) {
+    out.textContent = '';
+    out.className = '';
+    var p = res.data.prompts.length, t = res.data.tags;
+    out.appendChild(document.createTextNode(
+      '轉換了 ' + p + ' 筆提示詞 / Converted ' + p + ' prompt(s)' +
+      (res.skipped ? '\n略過 ' + res.skipped + ' 筆（缺 text）/ Skipped ' + res.skipped + ' (missing text)' : '') +
+      '\n建立了 ' + t.length + ' 個標籤 / Created ' + t.length + ' tag(s)' + (t.length ? '：' : '') + '\n'));
+    t.forEach(function (tag) {
+      var s = document.createElement('span');
+      s.className = 'tag';
+      s.textContent = tag.name;
+      out.appendChild(s);
+    });
+  }
+
+  function showError(msg) {
+    out.className = 'err';
+    out.textContent = '轉換失敗 / Conversion failed：' + msg;
+  }
+
+  fileIn.addEventListener('change', function () {
+    goBtn.disabled = !(fileIn.files && fileIn.files[0]);
+    out.textContent = '';
+  });
+
+  goBtn.addEventListener('click', function () {
+    var f = fileIn.files && fileIn.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var json;
+        try { json = JSON.parse(reader.result); } catch (e) { throw new Error('不是有效的 JSON / Invalid JSON'); }
+        var res = convert(json);
+        download(res.data);
+        showResult(res);
+      } catch (e) {
+        console.error('[PromptPopout]', e);
+        showError(e.message || String(e));
+      }
+    };
+    reader.onerror = function () {
+      console.error('[PromptPopout]', reader.error);
+      showError('讀檔失敗 / Could not read file');
+    };
+    reader.readAsText(f, 'utf-8');
+  });
+})();
+</script>
+</body>
+</html>

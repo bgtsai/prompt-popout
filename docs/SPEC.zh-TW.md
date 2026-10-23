@@ -1,0 +1,207 @@
+# Prompt Popout — 功能規格書 v1.0
+
+本文件只描述「行為與外觀」，不含任何既有程式碼。實作者請完全依本規格從零撰寫。
+
+## 0. 交付物
+
+1. `prompt_popout.user.js` — Tampermonkey userscript（單一檔案、純 JavaScript、無外部依賴、無 @require／@resource）。
+2. `tools/convert.html` — 一次性轉檔工具（單一 HTML 檔，離線開啟即可用），見第 9 節。
+
+## 1. 標頭
+
+- `@name Prompt Popout`
+- `@namespace https://github.com/bgtsai`
+- `@version 1.0.0`
+- `@author bgtsai`
+- `@description` 英文一句、`@description:zh-TW` 繁中一句（內容自擬：在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選填入）
+- `@license MIT`
+- `@homepageURL https://github.com/bgtsai/prompt-popout`
+- `@supportURL https://github.com/bgtsai/prompt-popout/issues`
+- `@updateURL` 與 `@downloadURL`：`https://raw.githubusercontent.com/bgtsai/prompt-popout/main/prompt_popout.user.js`
+- `@match`：`*://claude.ai/*`、`*://chatgpt.com/*`、`*://gemini.google.com/*`
+- `@grant`：只用到的 GM 函式（值的讀寫、註冊選單指令、GM_info 可直接用）
+- `@run-at document-end`、`@noframes`
+
+## 2. 命名與程式慣例（必守）
+
+- 所有自己加到網站 DOM 的 class、id、data 屬性、CSS 變數一律用前綴 `pp-`（CSS 變數 `--pp-…`），不可用通用名稱。
+- 依賴網站 DOM 的選擇器集中在一個常數物件（例如 `SITE_SELECTORS`），每個項目是「依序嘗試的選擇器陣列」。
+- 數值常數用功能語意命名，時間常數名稱或註解註明單位 ms。
+- 註解寫「為什麼」。
+- console 記錄統一前綴 `[PromptPopout]`；載入時印一行「v{版本} 已載入」，版本從 `GM_info.script.version` 讀，不寫死。
+- 容錯分支（catch）不可靜默吞錯，至少印一行 log。
+- 每影格執行的迴圈本身要 try/catch，單次失敗不能讓迴圈停掉。
+- 頁面可能啟用 Trusted Types（Gemini 有）：任何 innerHTML 寫入都要經過自建的 trustedTypes policy（policy 名稱用 `pp-…` 前綴；建立失敗則退回直接寫入）。或者完全不用 innerHTML、改用 DOM API 建元素，亦可。
+- 所有使用者資料插入 HTML 時必須跳脫。
+
+## 3. 介面語言
+
+- `navigator.language` 以 `zh` 開頭 → 繁體中文；其餘 → 英文。
+- 所有介面字串集中在一個字典物件（兩種語言各一份），不散落在程式各處。
+
+## 4. 支援網站與網站相關事實
+
+| 網站 | 輸入框選擇器（依序嘗試） | 送出鈕選擇器（依序嘗試） |
+|---|---|---|
+| claude.ai | `div[data-testid="chat-input"]`、`div.ProseMirror[contenteditable="true"]` | `button[data-testid="chat-input-send"]`、`button[aria-label="Send message"]`、`button[aria-label="傳送訊息"]` |
+| chatgpt.com | `#prompt-textarea`、`div.ProseMirror[contenteditable="true"]`、`textarea[name="prompt-textarea"]` | `[data-testid="send-button"]`、`#composer-submit-button` |
+| gemini.google.com | `rich-textarea div.ql-editor[contenteditable="true"]`、`div.ql-editor[contenteditable="true"]` | `button.send-button.submit`、`button:has(mat-icon[data-mat-icon-name="send"])`、`.send-button-container button` |
+
+- 選擇器若含 `:has` 而瀏覽器不支援會丟例外，嘗試時要個別 try/catch 後續試下一個。
+- 輸入框都是 contenteditable 富文字編輯器（Claude／ChatGPT 是 ProseMirror，Gemini 是 Quill），也可能是 textarea。**直接改 DOM 會被編輯器還原或送出空字串**，必須走瀏覽器的編輯指令（`document.execCommand`）讓編輯器自己的輸入管線處理；失敗時備援為派送一個帶 `text/plain` 的 paste 事件；最後派送 input 事件。textarea 則用原生 value setter 設值後派送 input 事件。
+- 已知事實：在 Claude 用 `insertText` 插入多行文字時，換行會被併成同一段。Claude 上要讓每一行成為獨立段落、空行保留為空段落（實作方式自行決定，例如插入 HTML 段落）。插入前游標移到內容最後。
+- 送出鈕在文字填入之後才變成可按（Claude 會從麥克風鈕換成送出鈕），所以「自動送出」要每 100 ms 輪詢一次，送出鈕存在且未 disabled、`aria-disabled` 不是 `"true"` 時點擊；最多等 4000 ms，逾時記 log 放棄。
+- Claude 有自家圖示字型：任何 `<span data-cds="Icon">` 都會套用該字型，其中私用區字元 U+E00F 是 Enter（↵）圖示。注意 Claude 首頁送出鈕是 U+E013（↑），不要拿錯。
+
+## 5. 把手（輸入卡片左側）— 外觀已由使用者逐項定案，必須精確照做
+
+### 5.1 找卡片
+
+- 每影格（requestAnimationFrame 迴圈）找輸入框；從輸入框往上最多 12 層，找第一個「右下角圓角 ≥ 8px 且寬度 ≥ 輸入框寬度」的祖先，即使用者眼睛看到的卡片。若某祖先已帶我們的卡片 class，直接採用（因為我們會改它的外觀）。找不到則用輸入框本身。
+- 輸入框消失：移除卡片上的 class、關閉清單。
+- 換了卡片：舊卡片移除 class。
+- 網站（React）重繪可能把 className 整個覆蓋，所以每影格檢查，class 不見就補回。只加 class 與 inline CSS 變數，**不搬動、不包裝、不改網站元素的內容**。
+
+### 5.2 卡片撐大（從底層讓網站自己畫框）
+
+令 R＝卡片左上角圓角（`getComputedStyle` 讀，四捨五入取整；讀不到用 14）。區塊寬 W＝2R。
+
+- 對卡片加 class（例如 `pp-card`），CSS：`margin-left:-W; width:calc(100% + W); max-width:none; padding-left:calc(W + 原左內距)`，全部 `!important`。效果：卡片右緣與文字位置不動，左邊長出 W 寬的一塊；**卡片的框線、陰影、圓角全由網站自己畫**，我們不畫任何外框。
+- 「原左內距」與 R 必須在第一次加 class **之前**讀（加了以後讀到的是自己改過的值），存成 inline CSS 變數。
+- R 之後可每秒重讀（網站介面縮放會改圓角）。
+
+### 5.3 區塊（卡片 `::before`）
+
+- `position:absolute; left:0; top:0; bottom:0`；寬＝W＋分隔線寬（分隔線畫在 W 之外，讓燈條在兩條可見邊界間正中）。
+- 左上、左下圓角 `inherit`（沿用卡片自己的值，不自己算）。
+- 背景＝頁面底色（卡片外面那層的不透明底色）。
+- 右側一條分隔線：顏色＝卡片外框線顏色、粗細＝卡片外框線粗細。
+- 游標 pointer。
+
+### 5.4 燈條（卡片 `::after`）
+
+- 寬 6px（必須是偶數，否則 W 為偶數時無法正中）、`border-radius:999px` 膠囊形、`pointer-events:none`。
+- 兩端半圓的圓心＝卡片左側圓角的圓心：`left = R − 3`、`top = R − 3`、`bottom = R − 3`（px，用取整後的 R）。
+- 平常顏色＝頁面底色疊上 20% 黑（深色頁面改疊 25% 白），換算成不透明色。
+- 滑過把手或清單開啟時：`#d97757`，顏色變化有約 120 ms 過渡。
+
+### 5.5 顏色讀取
+
+- 頁面底色：從卡片的父元素往上找第一個非透明的 `background-color`；都沒有則白色。
+- 卡片外框線：若卡片有 `border-left-width > 0` 就用 border 的色與寬（此時分隔線粗細 0，因 border 已在框內）；否則解析 `box-shadow`：它常是一長串、前面有多個透明的 `0px 0px 0px 0px` 項目，要找「非 inset、x/y/blur 皆 0、spread > 0、顏色非透明」的那一項，顏色與 spread 即框線色與寬。都沒有時用 `rgba(0,0,0,0.1)`、寬 0。
+- 顏色可能是 `color(srgb … / 0.1)` 等格式或半透明：一律疊在其底色上換算成不透明 `rgb()`，換算交給瀏覽器（例如 1×1 canvas 畫兩層再讀像素），不要自己解析顏色格式。
+- **分隔線色與粗細只在卡片靜止時讀一次並鎖定**：靜止＝卡片非 `:hover`、非 `:focus-within`、`getAnimations()` 為空。原因：Claude 卡片在 hover／focus 時外框會加深變粗且有轉場，而我們的區塊在卡片裡，滑鼠到把手就觸發卡片 hover，若持續重讀分隔線會時深時淺。只有頁面底色改變（換主題）時才解鎖重讀。
+- 頁面底色、燈條平常色每秒（約 60 影格）重算一次。
+
+### 5.6 觸發區
+
+- 判定以 document 上的滑鼠座標為準（偽元素無法綁事件）：x 在「卡片左緣 − 外框線寬 − 4px」到「卡片左緣 + W」之間，y 在卡片上下緣（含外框線寬）之間。
+
+## 6. 彈出清單
+
+### 6.1 開關
+
+- 滑鼠進入觸發區後 250 ms 開清單；離開觸發區或清單 350 ms 後關閉；回到觸發區或清單則取消關閉。
+- **競態必處理**：瀏覽器同一次滑鼠移動會先對清單發 `mouseenter`、再對 document 發 `mousemove`。若那一步同時離開觸發區又進入清單，清單會在滑鼠停在上面時被關掉。用「滑鼠在清單上」旗標：排程關閉前先看它；清單被程式隱藏時不會收到 mouseleave，所以關閉函式要自己把旗標歸零。
+- 點擊觸發區也能開／關（觸控裝置沒有 hover）；該點擊不可傳給網站（capture 階段攔下）。
+- 在清單與觸發區以外按下滑鼠 → 關閉。Esc → 關閉。
+
+### 6.2 位置
+
+- `position:fixed`，掛在我們自己的根容器（掛在 body 下），z-index 極高（2147483000 級）。
+- 水平：卡片左緣 + W + 4px（開在把手右側，疊在卡片上，不蓋住把手）。
+- 垂直：以「開啟當下滑鼠的 y」定位，使滑鼠所在高度落在清單下緣往上約 24px 處；開啟後鎖定不跟隨。上下左右都夾在視窗內留 8px。
+- 原因：把手可能很高，清單固定開在卡片上方或下方時，滑鼠還沒移過去就被關閉計時器關掉。
+
+### 6.3 內容
+
+- 寬 320px、最高 60vh 可捲動、圓角 10px、陰影、字級 16px；淺色與深色（`prefers-color-scheme`）各一套配色。
+- 頂端：標籤列（有標籤才顯示）。每個標籤是一顆膠囊鈕，用該標籤的底色／字色；未選取時半透明（約 55%），選取時不透明。可多選，篩選邏輯為「提示詞必須同時擁有所有已選標籤」（AND）。篩選狀態只存在記憶體，不存檔。已刪除的標籤自動從篩選中移除。
+- 中間：提示詞列，依使用者排序。每列：標題（單行省略號）＋（若啟用填空）一個小字「填空／Fill」標記＋（若啟用自動送出）一個 Enter 圖示。滑過整列底色變淺灰。整列滑鼠提示（title）＝內容前 300 字。
+  - Enter 圖示：在 Claude 用 `<span data-cds="Icon">` 包 U+E00F；其他網站用自繪的 SVG 回車箭頭（顏色跟隨文字色）。16×16、灰色。
+- 沒有提示詞：顯示「還沒有提示詞」；有提示詞但篩選後為空：顯示「沒有符合標籤的提示詞」。
+- 底部：一顆「管理…」小按鈕，開管理視窗並關閉清單。
+- 點提示詞：關閉清單 → 使用該提示詞（第 7 節）。
+
+## 7. 使用提示詞
+
+1. 若該提示詞啟用「填空」：解析欄位，有欄位就開填空對話框；使用者取消則整個中止。
+2. 找輸入框；找不到則訊息框「找不到輸入框」。
+3. 依第 4 節方式插入文字（附加在現有內容之後）。
+4. 若啟用「自動送出」：依第 4 節等送出鈕可按後點擊。
+
+### 7.1 填空語法
+
+文字中的 `[欄位名稱]` 是一個欄位。可選的附加：
+
+- `[欄位名稱::預設值]` — `::` 之後為預設值（預先填在輸入框）
+- `[欄位名稱](說明)` — 緊接的小括號為說明文字（顯示在欄位名稱旁，灰色小字）
+- 兩者可併用：`[欄位名稱::預設值](說明)`
+
+規則：
+- 中括號內不可含換行、`[`、`]`、`=`、`$`；不符合的保持原樣。欄位名稱與預設值前後空白去除；名稱為空則不算欄位。
+- 同名欄位只問一次，填入值替換所有同名出現處（含其說明括號一併替換掉）。
+- 沒有勾「使用填空」的提示詞，中括號原樣送出，不詢問。
+
+### 7.2 填空對話框
+
+- 標題「填入欄位」。每個欄位一個多行輸入框（高約 60px），上方標示欄位名稱與說明。預設值預先填入。
+- 按鈕：取消、填入。快捷鍵：Esc＝取消；Ctrl／Cmd＋Enter＝填入。開啟後焦點在第一個欄位。
+
+## 8. 管理視窗
+
+### 8.1 共通對話框
+
+- 半透明黑色遮罩全螢幕、置中白色（深色模式為深灰）面板，寬 min(680px, 100%)，最高 90vh，內容區可捲動；標題列、內容區、底部按鈕列。
+- 遮罩上的鍵盤事件不可冒泡到網站（網站快捷鍵會搶輸入）。點遮罩空白處關閉。
+- 另有：訊息框（一顆確定）、確認框（取消／確定，確定為紅字危險樣式）。
+- 字級：內文與輸入框 16px、說明小字 13～14px、標題 18px。
+
+### 8.2 提示詞清單（管理首頁）
+
+- 入口：彈出清單的「管理…」；以及 Tampermonkey 選單指令「管理提示詞／Manage prompts」。
+- 每列：標題、該提示詞的標籤膠囊、上移、下移（第一列不能上移、最後一列不能下移）、編輯、刪除（需確認）。
+- 底部：匯入、匯出、標籤…、（空白撐開）、新增（主色）、關閉。
+
+### 8.3 新增／編輯提示詞
+
+- 欄位：標題（單行）、內容（多行、等寬字型、高約 180px 可調整）、一行灰字說明填空語法、勾選「使用填空」、勾選「填入後自動送出」、標籤（有標籤時列出所有標籤的勾選框）。
+- 儲存：內容為空則訊息框「內容不能是空的」並留在編輯畫面；標題空白則存成「(無標題)」。開啟時焦點在標題。
+
+### 8.4 標籤管理
+
+- 每列：標籤膠囊預覽、底色選色器、字色選色器、刪除（需確認，提示「提示詞本身不會被刪」；刪除後所有提示詞移除該標籤）。
+- 最下面：新標籤名稱輸入框＋新增。新標籤預設底色 `#7071fc`、字色 `#ffffff`。名稱重複（不分大小寫）則不新增。
+
+### 8.5 匯入／匯出
+
+- 匯出：下載一個 JSON 檔，檔名 `prompt-popout_YYYYMMDD.json`，內容即第 10 節的資料格式（含標籤與顏色）。
+- 匯入：選擇 JSON 檔，格式同第 10 節。匯入的提示詞**附加**到現有清單尾端（給新 id）；標籤依名稱（不分大小寫）對應到現有標籤，沒有的就新建（沿用檔案中的顏色）。完成後訊息框「已匯入 N 筆提示詞」；格式錯誤則「匯入失敗：原因」。
+- 只支援本腳本自己的 JSON 格式，不支援任何其他工具的格式。
+
+## 9. 轉檔工具 `tools/convert.html`
+
+用途：使用者從舊工具匯出的 JSON，轉成本腳本可匯入的 JSON。單一 HTML 檔、無網路、介面繁中＋英文並列即可。
+
+- 選檔 → 轉換 → 下載 `prompt-popout_import.json`，並顯示轉換了幾筆、建立了哪些標籤。
+- 舊格式：JSON 陣列，每個元素是物件 `{ title: string, text: string, usePlaceholders: boolean, autoExecute: boolean, tags: string[], usageCount?: number }`；`tags` 裡是標籤名稱字串。缺 `text` 或非字串的元素略過。
+- 對應：`title`→標題（空則「(無標題)」）、`text`→內容、`usePlaceholders`→使用填空、`autoExecute`→自動送出、`tags`→依名稱建立標籤（不分大小寫去重，預設顏色 `#7071fc`／`#ffffff`）。其他欄位捨棄。
+- 填空語法相同，內容不需改寫。
+
+## 10. 資料模型與儲存
+
+- 只用兩個 GM 儲存鍵：`pp.prompts`、`pp.tags`（不可用其他名稱）。
+- `pp.prompts`：陣列，順序即顯示順序。元素：`{ id: string, title: string, text: string, fill: boolean, autoSend: boolean, tagIds: string[] }`。
+- `pp.tags`：陣列，順序即顯示順序。元素：`{ id: string, name: string, bg: string(#rrggbb), fg: string(#rrggbb) }`。
+- id 用 `crypto.randomUUID()`（不支援時自行產生足夠隨機的字串）。
+- 匯出／匯入檔格式：`{ "format": "prompt-popout", "version": 1, "tags": [...同上], "prompts": [...同上] }`。匯入時以 `format` 欄位驗證。
+
+## 11. 不做的事
+
+- 不支援其他網站、快捷鍵、雲端同步、使用次數統計、進階填空語法（下拉選單、隱藏變數、檔案）。
+- 不讀寫任何其他 GM 儲存鍵。
+
+## 12. 交付前自檢
+
+- `node --check` 或 acorn 解析無語法錯誤。
+- 無同作用域重複宣告、無未定義識別字。
