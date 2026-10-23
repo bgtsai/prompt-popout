@@ -32,6 +32,24 @@ Tampermonkey will keep it up to date from then on.
 
 ![Prompt editor](docs/img/editor.en.png)
 
+### How fill-in blanks work
+
+When a prompt stays the same except for a few words (which language, what tone), write those words as blanks. Take this prompt:
+
+```
+Translate the text below into [language::English], in a [tone](e.g. formal, casual) tone.
+```
+
+1. Click it in the list and a fill-in window opens first, with one box per blank. *language* is already filled with English, and *tone* shows the hint "e.g. formal, casual".
+
+   ![Fill-in window](docs/img/fill.en.png)
+
+2. Fill them in and click **Fill** (or press Ctrl+Enter, ⌘+Enter on a Mac). The chat box gets the finished sentence, with no brackets left:
+
+   ![Chat box after filling in](docs/img/filled.en.png)
+
+Click **Cancel** or press Esc to insert nothing.
+
 ### Writing fill-in blanks
 
 The fill-in window only appears for prompts with **Use fill-in blanks** ticked.

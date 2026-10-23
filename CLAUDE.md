@@ -12,7 +12,7 @@ npm i acorn acorn-walk                      # 只有 check.js 需要
 node tests/check.js prompt_popout.user.js   # 語法、同作用域重複宣告、作用域鏈上看不到的識別字
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node tests/regress.js [腳本] [截圖目錄]   # 三引擎 × 三網站模擬頁
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node tests/convert_import.js             # 轉檔 → 匯入 → 匯出
-node tests/shot.js                          # 重產 README 截圖 docs/img/（清單、編輯頁，中英各一）
+node tests/shot.js                          # 重產 README 截圖 docs/img/（清單、編輯頁、填空視窗、填好的輸入框，中英各一）
 ```
 
 模擬頁不含 Claude 的圖示字型，Claude 上的 Enter 圖示在測試截圖裡會顯示成缺字，實機正常。真實網站的選擇器要實機確認。
