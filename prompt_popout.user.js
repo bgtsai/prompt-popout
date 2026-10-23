@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name               Prompt Popout
 // @namespace          https://github.com/bgtsai
-// @version            1.0.0
+// @version            1.1.0
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
@@ -37,7 +37,14 @@
 
   const DEFAULT_TAG_BG = '#7071fc';
   const DEFAULT_TAG_FG = '#ffffff';
-  const ACCENT_COLOR = '#d97757';
+  const ACCENT_COLOR = '#d97757';            // 主按鈕色
+  // 把手 hover／清單開啟時的顏色，跟各站主色走（使用者指定）：
+  // Claude 陶土橘；ChatGPT 主色是黑（深色主題反過來用白，否則黑底看不到）；Gemini 沒有明顯主色，用 Google 藍（深色主題用淺藍）
+  const SITE_ACTIVE_COLOR = {
+    claude: { light: '#d97757', dark: '#d97757' },
+    chatgpt: { light: '#000000', dark: '#ffffff' },
+    gemini: { light: '#0b57d0', dark: '#a8c7fa' },
+  };
 
   const CARD_SEARCH_MAX_DEPTH = 12;          // 從輸入框往上找卡片的最大層數
   const CARD_MIN_CORNER_RADIUS_PX = 8;       // 卡片右下角圓角門檻
@@ -105,7 +112,30 @@
       editPrompt: '編輯提示詞',
       fieldTitle: '標題',
       fieldText: '內容',
-      fillHelp: '填空語法：[欄位名稱]、[欄位名稱::預設值]、[欄位名稱](說明)，可併用。',
+      fillHelp: '例如：翻成[語言::英文]',
+      helpLink: '詳細說明',
+      tagsIntro: '標籤用來分類提示詞，在彈出清單上方點選即可篩選。',
+      help: {
+        fill: {
+          title: '填空',
+          intro: '勾選「使用填空」後，內容裡的 [欄位] 會在填入前先問你要填什麼。',
+          syntax: [['[語言]', '欄位'], ['[語言::英文]', '有預設值（兩個冒號）'], ['[語言](要翻成哪種)', '旁邊顯示提示']],
+          example: { label: '範例', before: '把下面翻成[語言::英文]，語氣[語氣]。\n最後用[語言]寫一句摘要。', middle: '填入：語言＝日文、語氣＝正式', after: '把下面翻成日文，語氣正式。\n最後用日文寫一句摘要。' },
+          notes: ['同名欄位只問一次。', '沒勾「使用填空」時，中括號原樣送出。'],
+        },
+        autoSend: {
+          title: '填入後自動送出',
+          intro: '文字填進輸入框後，自動按下送出。清單裡有 ↵ 圖示的就是會自動送出的。',
+          example: { label: '範例', pairs: [['總結這段對話', '勾：點了直接送出'], ['檢查錯字：', '不勾：填入後還要接著貼上文字']] },
+          notes: ['送出鈕 4 秒內一直按不下去（例如還在上傳檔案）就不送，文字留在輸入框。'],
+        },
+        tags: {
+          title: '標籤',
+          intro: '標籤只用來篩選彈出清單，不會被送出、不影響內容。',
+          example: { label: '範例', before: '檢查程式碼　→ 工作、程式\n寫週報　　　→ 工作', middle: '清單上方點「程式」', after: '只剩「檢查程式碼」' },
+          notes: ['同時點多個標籤＝要全部都有才顯示。', '「管理…」→「標籤…」建立標籤、改顏色；編輯提示詞時勾選。', '刪除標籤不會刪除提示詞。'],
+        },
+      },
       useFill: '使用填空',
       autoSend: '填入後自動送出',
       tagsLabel: '標籤',
@@ -153,7 +183,30 @@
       editPrompt: 'Edit prompt',
       fieldTitle: 'Title',
       fieldText: 'Content',
-      fillHelp: 'Fill syntax: [name], [name::default], [name](hint) — may be combined.',
+      fillHelp: 'e.g. Translate into [language::English]',
+      helpLink: 'Details',
+      tagsIntro: 'Tags group your prompts; click them at the top of the pop-out list to filter.',
+      help: {
+        fill: {
+          title: 'Fill-in fields',
+          intro: 'With "Use fill-in fields" ticked, every [field] in the content is asked for before the prompt is inserted.',
+          syntax: [['[language]', 'a field'], ['[language::English]', 'with a default (two colons)'], ['[language](which one)', 'with a hint next to it']],
+          example: { label: 'Example', before: 'Translate this into [language::English], [tone] tone.\nEnd with a one-line summary in [language].', middle: 'Fill in: language = Japanese, tone = formal', after: 'Translate this into Japanese, formal tone.\nEnd with a one-line summary in Japanese.' },
+          notes: ['A field used twice is asked only once.', 'Without "Use fill-in fields", brackets are sent as they are.'],
+        },
+        autoSend: {
+          title: 'Auto-send after insert',
+          intro: 'Presses send for you once the text is in. Prompts marked ↵ in the list do this.',
+          example: { label: 'Example', pairs: [['Summarise this conversation', 'Ticked: sent straight away'], ['Fix the typos in:', 'Not ticked: you still paste the text after it']] },
+          notes: ['If the send button stays disabled for 4 seconds (e.g. a file is still uploading), nothing is sent and the text stays in the box.'],
+        },
+        tags: {
+          title: 'Tags',
+          intro: 'Tags only filter the pop-out list. They are never sent and do not change the content.',
+          example: { label: 'Example', before: 'Review code   → Work, Code\nWeekly report → Work', middle: 'Click "Code" at the top of the list', after: 'Only "Review code" is left' },
+          notes: ['Several tags selected = a prompt must have all of them.', 'Create tags and set colours in Manage… → Tags…; tick them when editing a prompt.', 'Deleting a tag never deletes prompts.'],
+        },
+      },
       useFill: 'Use fill-in fields',
       autoSend: 'Auto-send after insert',
       tagsLabel: 'Tags',
@@ -406,7 +459,7 @@
   transition: background-color 120ms ease;
   z-index: 2;
 }
-.pp-card.pp-active::after { background-color: ${ACCENT_COLOR}; }
+.pp-card.pp-active::after { background-color: var(--pp-active, ${ACCENT_COLOR}); }
 
 #pp-root {
   --pp-bg: #ffffff; --pp-fg: #1f1f1f; --pp-muted: #6b6b6b; --pp-border: rgba(0,0,0,0.12);
@@ -428,8 +481,8 @@
 }
 #pp-root .pp-tagbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 4px 6px; }
 #pp-root .pp-tag {
-  display: inline-block; border: none; border-radius: 999px; padding: 2px 9px; font-size: 13px;
-  line-height: 1.5; cursor: pointer; white-space: nowrap; font-family: inherit;
+  display: inline-block; border: none; border-radius: 999px; padding: 4px 12px; font-size: 16px;
+  line-height: 1.25; cursor: pointer; white-space: nowrap; font-family: inherit;
 }
 #pp-root .pp-tag.pp-off { opacity: 0.55; }
 #pp-root .pp-tag.pp-static { cursor: default; }
@@ -438,16 +491,18 @@
 }
 #pp-root .pp-row:hover { background: var(--pp-hover); }
 #pp-root .pp-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#pp-root .pp-badge { font-size: 11px; color: var(--pp-muted); border: 1px solid var(--pp-border); border-radius: 4px; padding: 0 4px; flex: none; }
+#pp-root .pp-badge { font-size: 16px; line-height: 1.25; color: var(--pp-muted); border: 1px solid var(--pp-border); border-radius: 6px; padding: 1px 6px; flex: none; }
 #pp-root .pp-enter { width: 16px; height: 16px; flex: none; color: #8a8a8a; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; }
 #pp-root .pp-empty { padding: 10px 8px; color: var(--pp-muted); }
 #pp-root .pp-popup-foot { display: flex; justify-content: flex-end; padding: 6px 4px 2px; border-top: 1px solid var(--pp-border); margin-top: 4px; }
+/* 所有按鈕同一套尺寸（30 第⑲條）：高 36、字 16（03 第⑪條下限）、圓角 10（約邊長 28%，不生硬）。
+   主要／一般／危險只靠顏色區分，不靠大小。 */
 #pp-root .pp-btn {
-  font: inherit; font-size: 14px; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; height: 36px; box-sizing: border-box;
+  font: inherit; font-size: 16px; line-height: 1; padding: 0 14px; border-radius: 10px; cursor: pointer; white-space: nowrap;
   border: 1px solid var(--pp-border); background: var(--pp-btn-bg); color: var(--pp-fg);
 }
 #pp-root .pp-btn:disabled { opacity: 0.4; cursor: default; }
-#pp-root .pp-btn-small { font-size: 13px; padding: 3px 8px; }
 #pp-root .pp-btn-primary { background: ${ACCENT_COLOR}; border-color: ${ACCENT_COLOR}; color: #fff; }
 #pp-root .pp-btn-danger { color: var(--pp-danger); }
 #pp-root .pp-overlay {
@@ -461,14 +516,28 @@
 }
 /* 面板本身取得焦點只是為了接鍵盤事件，不需要焦點框（瀏覽器預設會畫一圈粗黑框） */
 #pp-root .pp-dialog:focus { outline: none; }
-#pp-root .pp-dialog-head { font-size: 18px; font-weight: 600; padding: 14px 18px; border-bottom: 1px solid var(--pp-border); }
+#pp-root .pp-dialog-head { font-size: 22px; font-weight: 700; padding: 14px 18px; border-bottom: 1px solid var(--pp-border); }
 #pp-root .pp-dialog-body { padding: 14px 18px; overflow-y: auto; flex: 1; min-height: 0; }
 #pp-root .pp-dialog-foot { display: flex; gap: 8px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--pp-border); flex-wrap: wrap; }
 #pp-root .pp-spacer { flex: 1; }
 #pp-root .pp-field { margin-bottom: 12px; }
-#pp-root .pp-label { display: block; margin-bottom: 4px; font-weight: 600; }
-#pp-root .pp-hint { font-size: 13px; color: var(--pp-muted); font-weight: normal; margin-left: 6px; }
-#pp-root .pp-help { font-size: 13px; color: var(--pp-muted); margin: 4px 0 10px; }
+#pp-root .pp-label { font-size: 18px; font-weight: 600; }
+#pp-root .pp-label-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+#pp-root .pp-hint { font-size: 16px; color: var(--pp-muted); font-weight: normal; margin-left: 6px; }
+#pp-root .pp-help { font-size: 16px; color: var(--pp-muted); margin: 4px 0 10px; }
+/* 「詳細說明」連結：連結藍、底線（03 第⑬節），淺／深色各一 */
+#pp-root .pp-link { font: inherit; font-size: 16px; font-weight: normal; color: #065fd4; text-decoration: underline; background: none; border: none; padding: 0; cursor: pointer; }
+@media (prefers-color-scheme: dark) { #pp-root .pp-link { color: #3ea6ff; } }
+#pp-root .pp-check-row { display: flex; align-items: center; gap: 12px; }
+/* 說明視窗：中性色，範例用等寬字＋淡底跟敘述分開 */
+#pp-root .pp-help-intro { margin: 0 0 14px; }
+#pp-root .pp-help-h { font-size: 18px; font-weight: 600; margin: 16px 0 6px; }
+#pp-root .pp-code { font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: 16px; background: var(--pp-hover); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; }
+#pp-root .pp-arrow { color: var(--pp-muted); margin: 4px 0 4px 10px; }
+#pp-root .pp-syntax { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; }
+#pp-root .pp-syntax .pp-code { padding: 2px 8px; }
+#pp-root .pp-help ul, #pp-root .pp-help-list { margin: 12px 0 0; padding-left: 20px; }
+#pp-root .pp-help-list li { margin: 4px 0; }
 #pp-root input[type="text"], #pp-root textarea {
   width: 100%; font: inherit; font-size: 16px; padding: 6px 8px; border-radius: 6px;
   border: 1px solid var(--pp-border); background: var(--pp-input-bg); color: var(--pp-fg);
@@ -480,7 +549,7 @@
 #pp-root .pp-mrow { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--pp-border); flex-wrap: wrap; }
 #pp-root .pp-mrow-title { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #pp-root .pp-mrow-tags { display: flex; gap: 4px; flex-wrap: wrap; }
-#pp-root input[type="color"] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--pp-border); border-radius: 4px; background: none; cursor: pointer; }
+#pp-root input[type="color"] { width: 40px; height: 36px; padding: 0; border: 1px solid var(--pp-border); border-radius: 4px; background: none; cursor: pointer; }
 #pp-root .pp-msg { white-space: pre-wrap; }
 `;
 
@@ -628,6 +697,7 @@
       setVar(card, '--pp-page-bg', bg);
       const dark = luminance(bg) < 0.5;
       setVar(card, '--pp-pill', compositeOver(dark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)', bg));
+      setVar(card, '--pp-active', SITE_ACTIVE_COLOR[SITE][dark ? 'dark' : 'light']);
     }
   }
 
@@ -842,7 +912,7 @@
     }
 
     popup.appendChild(h('div', { class: 'pp-popup-foot' },
-      h('button', { type: 'button', class: 'pp-btn pp-btn-small', text: T.manageBtn, onclick: () => { closePopup(); showManager(); } })));
+      h('button', { type: 'button', class: 'pp-btn', text: T.manageBtn, onclick: () => { closePopup(); showManager(); } })));
   }
 
   function positionPopup(popup, mouseY) {
@@ -1118,6 +1188,32 @@
     });
   }
 
+
+  // 「詳細說明」：連結樣式的按鈕，點了開獨立說明視窗（說明佔篇幅，平常收起來）
+  function helpLink(topic) {
+    return h('button', { type: 'button', class: 'pp-link', text: T.helpLink, onclick: (e) => { e.preventDefault(); showHelp(topic); } });
+  }
+
+  function showHelp(topic) {
+    const d = T.help[topic];
+    const body = h('div', null, h('p', { class: 'pp-help-intro', text: d.intro }));
+    if (d.syntax) {
+      body.appendChild(h('div', { class: 'pp-syntax' }, d.syntax.map(([code, desc]) => [h('span', { class: 'pp-code', text: code }), h('span', { text: desc })]).flat()));
+    }
+    const ex = d.example;
+    body.appendChild(h('div', { class: 'pp-help-h', text: ex.label }));
+    if (ex.pairs) {
+      // 並列對照（左：內容，右：說明），不用箭頭——箭頭會被讀成「上面變成下面」
+      body.appendChild(h('div', { class: 'pp-syntax' }, ex.pairs.map(([code, desc]) => [h('span', { class: 'pp-code', text: code }), h('span', { text: desc })]).flat()));
+    } else {
+      body.appendChild(h('div', { class: 'pp-code', text: ex.before }));
+      body.appendChild(h('div', { class: 'pp-arrow', text: '↓ ' + ex.middle }));
+      body.appendChild(h('div', { class: 'pp-code', text: ex.after }));
+    }
+    if (d.notes && d.notes.length) body.appendChild(h('ul', { class: 'pp-help-list' }, d.notes.map((n) => h('li', { text: n }))));
+    const dlg = openDialog({ title: d.title, body, onCancel: () => dlg.close(), buttons: [{ text: T.close, primary: true, onClick: () => dlg.close() }] });
+  }
+
   // ───────────────────────── 管理視窗 ─────────────────────────
 
   let managerRefresh = null;
@@ -1142,11 +1238,11 @@
         list.appendChild(h('div', { class: 'pp-mrow' },
           h('span', { class: 'pp-mrow-title', text: p.title || T.untitled, title: String(p.text || '').slice(0, TOOLTIP_MAX_CHARS) }),
           h('span', { class: 'pp-mrow-tags' }, (p.tagIds || []).map((id) => tagMap.get(id)).filter(Boolean).map((t) => tagPill(t))),
-          h('button', { type: 'button', class: 'pp-btn pp-btn-small', text: T.up, disabled: i === 0, onclick: () => move(-1) }),
-          h('button', { type: 'button', class: 'pp-btn pp-btn-small', text: T.down, disabled: i === prompts.length - 1, onclick: () => move(1) }),
-          h('button', { type: 'button', class: 'pp-btn pp-btn-small', text: T.edit, onclick: () => showEditor(p.id) }),
+          h('button', { type: 'button', class: 'pp-btn', text: T.up, disabled: i === 0, onclick: () => move(-1) }),
+          h('button', { type: 'button', class: 'pp-btn', text: T.down, disabled: i === prompts.length - 1, onclick: () => move(1) }),
+          h('button', { type: 'button', class: 'pp-btn', text: T.edit, onclick: () => showEditor(p.id) }),
           h('button', {
-            type: 'button', class: 'pp-btn pp-btn-small pp-btn-danger', text: T.del,
+            type: 'button', class: 'pp-btn pp-btn-danger', text: T.del,
             onclick: async () => {
               if (!(await showConfirm(T.confirmDeletePrompt(p.title || T.untitled)))) return;
               setPrompts(getPrompts().filter((x) => x.id !== p.id));
@@ -1185,14 +1281,15 @@
       return { t, cb };
     });
     const body = h('div', null,
-      h('div', { class: 'pp-field' }, h('label', { class: 'pp-label', text: T.fieldTitle }), titleIn),
-      h('div', { class: 'pp-field' }, h('label', { class: 'pp-label', text: T.fieldText }), textIn,
-        h('div', { class: 'pp-help', text: T.fillHelp })),
-      h('label', { class: 'pp-check' }, fillCb, T.useFill),
-      h('label', { class: 'pp-check' }, sendCb, T.autoSend),
-      tags.length ? h('div', { class: 'pp-field', style: 'margin-top:10px' },
-        h('span', { class: 'pp-label', text: T.tagsLabel }),
-        h('div', { class: 'pp-taglist' }, tagCbs.map(({ t, cb }) => h('label', { class: 'pp-check' }, cb, tagPill(t))))) : null);
+      h('div', { class: 'pp-field' }, h('div', { class: 'pp-label-row' }, h('label', { class: 'pp-label', text: T.fieldTitle })), titleIn),
+      h('div', { class: 'pp-field' }, h('div', { class: 'pp-label-row' }, h('label', { class: 'pp-label', text: T.fieldText })), textIn),
+      // 勾選框與「詳細說明」並列：連結不可放進 <label> 裡，否則點連結會順便切換勾選
+      h('div', { class: 'pp-check-row' }, h('label', { class: 'pp-check' }, fillCb, T.useFill), h('span', { class: 'pp-hint', style: 'margin-left:0', text: T.fillHelp }), helpLink('fill')),
+      h('div', { class: 'pp-check-row' }, h('label', { class: 'pp-check' }, sendCb, T.autoSend), helpLink('autoSend')),
+      h('div', { class: 'pp-field', style: 'margin-top:10px' },
+        h('div', { class: 'pp-label-row' }, h('span', { class: 'pp-label', text: T.tagsLabel }), helpLink('tags')),
+        tags.length ? null : h('div', { class: 'pp-help', style: 'margin:0', text: T.noTags }),
+        h('div', { class: 'pp-taglist' }, tagCbs.map(({ t, cb }) => h('label', { class: 'pp-check' }, cb, tagPill(t))))));
     const save = async () => {
       const text = textIn.value;
       if (!text.trim()) { await showMessage(T.emptyText); textIn.focus(); return; }
@@ -1245,7 +1342,7 @@
           h('span', { class: 'pp-hint', text: T.bgColor }), bgIn,
           h('span', { class: 'pp-hint', text: T.fgColor }), fgIn,
           h('button', {
-            type: 'button', class: 'pp-btn pp-btn-small pp-btn-danger', text: T.del,
+            type: 'button', class: 'pp-btn pp-btn-danger', text: T.del,
             onclick: async () => {
               if (!(await showConfirm(T.confirmDeleteTag(t.name)))) return;
               setTags(getTags().filter((x) => x.id !== t.id));
@@ -1268,7 +1365,9 @@
       refresh();
     };
     nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); } });
-    const body = h('div', null, list,
+    const body = h('div', null,
+      h('div', { class: 'pp-help', style: 'margin:0 0 8px' }, T.tagsIntro, ' ', helpLink('tags')),
+      list,
       h('div', { style: 'display:flex;gap:8px;margin-top:12px' }, nameIn,
         h('button', { type: 'button', class: 'pp-btn', text: T.addBtn, onclick: add })));
     const done = () => { dlg.close(); if (managerRefresh) managerRefresh(); };

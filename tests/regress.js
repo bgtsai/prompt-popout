@@ -154,7 +154,8 @@ async function runSite(engineName, browser, site) {
     check(`${tag} 清單寬 320`, Math.abs(m.width - 320) < 1, m.width);
     check(`${tag} 清單在把手右側 (卡片左+W+4)`, Math.abs(m.left - (cb.left + W + 4)) < 1.5, { left: m.left, expected: cb.left + W + 4 });
     check(`${tag} 空狀態文字`, /還沒有提示詞/.test(m.text), m.text);
-    check(`${tag} 燈條變陶土橘`, (await cardBox(page)).afterBg === 'rgb(217, 119, 87)', (await cardBox(page)).afterBg);
+    const ACTIVE = { claude: 'rgb(217, 119, 87)', chatgpt: 'rgb(0, 0, 0)', gemini: 'rgb(11, 87, 208)' }[site];
+    check(`${tag} 燈條變該站主色`, (await cardBox(page)).afterBg === ACTIVE, (await cardBox(page)).afterBg);
     if (SHOT_DIR && site === 'claude') await page.screenshot({ path: path.join(SHOT_DIR, `${engineName}_${site}_open_empty.png`), clip: { x: cb.left - 10, y: cb.top - 20, width: 420, height: 200 } });
   }
   // Esc 關閉
@@ -213,10 +214,37 @@ async function runSite(engineName, browser, site) {
   await sleep(200);
   check(`${tag} 管理視窗開啟`, await page.evaluate(() => /管理提示詞|Manage/.test(document.body.innerText)));
   if (SHOT_DIR && site === 'claude') await page.screenshot({ path: path.join(SHOT_DIR, `${engineName}_${site}_manager.png`) });
+  // 03 第⑪條：所有可見文字 ≥ 16px；30 第⑲條：所有按鈕同一高度
+  const sizes = await page.evaluate(() => {
+    const els = [...document.querySelectorAll('#pp-root *')].filter((e) => e.offsetParent && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
+    const small = els.filter((e) => parseFloat(getComputedStyle(e).fontSize) < 16).map((e) => e.className + ':' + getComputedStyle(e).fontSize);
+    const hs = [...new Set([...document.querySelectorAll('#pp-root .pp-btn')].filter((b) => b.offsetParent).map((b) => Math.round(b.getBoundingClientRect().height)))];
+    return { small, hs };
+  });
+  check(`${tag} 管理視窗文字皆 ≥16px`, sizes.small.length === 0, sizes.small.slice(0, 5));
+  check(`${tag} 管理視窗按鈕同高`, sizes.hs.length === 1 && sizes.hs[0] === 36, sizes.hs);
   const before3 = await page.evaluate(() => __store['pp.prompts'].length);
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => /^(新增|New|Add)$/.test(x.innerText.trim())); b.click(); });
   await sleep(200);
   if (SHOT_DIR && site === 'claude') await page.screenshot({ path: path.join(SHOT_DIR, `${engineName}_${site}_edit.png`) });
+  // 編輯頁三個「詳細說明」連結都能開說明視窗，且不會切換勾選框
+  const helpRes = await page.evaluate(async () => {
+    const out = [];
+    const links = [...document.querySelectorAll('#pp-root .pp-link')].filter((x) => x.offsetParent);
+    const cbs0 = [...document.querySelectorAll('#pp-root input[type=checkbox]')].map((c) => c.checked).join();
+    for (const l of links) {
+      l.click(); await new Promise((r) => setTimeout(r, 80));
+      const dlgs = [...document.querySelectorAll('#pp-root .pp-dialog')];
+      const top = dlgs[dlgs.length - 1];
+      out.push({ title: top.querySelector('.pp-dialog-head').innerText, hasCode: !!top.querySelector('.pp-code') });
+      [...top.querySelectorAll('button')].find((b) => /關閉|Close/.test(b.innerText)).click();
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const cbs1 = [...document.querySelectorAll('#pp-root input[type=checkbox]')].map((c) => c.checked).join();
+    return { out, same: cbs0 === cbs1 };
+  });
+  check(`${tag} 編輯頁 3 個詳細說明都能開、含範例`, helpRes.out.length === 3 && helpRes.out.every((x) => x.hasCode), helpRes.out);
+  check(`${tag} 點詳細說明不切換勾選`, helpRes.same);
   await page.evaluate(() => {
     const ins = [...document.querySelectorAll('input[type=text]')].filter((x) => x.offsetParent); const tas = [...document.querySelectorAll('textarea')].filter((x) => x.offsetParent);
     ins[ins.length - 1].value = 'New one'; tas[tas.length - 1].value = 'body';

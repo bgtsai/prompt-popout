@@ -8,7 +8,7 @@ A Tampermonkey userscript that adds a slim handle to the left of the chat input 
 
 ## Features
 
-- **Handle on the input card** — the card grows a small block on its left with a pill-shaped handle. It turns orange while you hover or while the list is open.
+- **Handle on the input card** — the card grows a small block on its left with a pill-shaped handle. It takes the site's accent colour (orange on Claude, black on ChatGPT, blue on Gemini) while you hover or while the list is open.
 - **Pop-out list** — opens next to the handle at the height of your mouse pointer. Hover to open, or click (for touch devices).
 - **Fill-in fields** — write `[field]` in a prompt and you are asked for the value before it is inserted.
 - **Auto-send** — optionally press send for you once the text is in.
