@@ -21,7 +21,7 @@ Keep the prompts you use all the time one hover away. Prompt Popout puts a slim 
 ## Install
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/).
-2. Click here to install: [prompt_popout.user.js](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/prompt_popout.user.js)
+2. Install from [Greasy Fork](https://greasyfork.org/en/scripts/601742-prompt-popout), or straight from GitHub: [prompt_popout.user.js](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/prompt_popout.user.js)
 
 Tampermonkey will keep it up to date from then on.
 

@@ -21,7 +21,7 @@
 ## 安裝
 
 1. 先安裝 [Tampermonkey](https://www.tampermonkey.net/)。
-2. 點這裡安裝：[prompt_popout.user.js](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/prompt_popout.user.js)
+2. 到 [Greasy Fork](https://greasyfork.org/zh-TW/scripts/601742-prompt-popout) 安裝，或直接從 GitHub 安裝：[prompt_popout.user.js](https://raw.githubusercontent.com/bgtsai/prompt-popout/main/prompt_popout.user.js)
 
 之後有新版本，Tampermonkey 會自動更新。
 
