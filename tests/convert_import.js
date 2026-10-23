@@ -20,7 +20,13 @@ const OLD = [
   const b = await PW.chromium.launch();
   // 1. 轉檔
   fs.writeFileSync(path.join(TMP, 'old.json'), JSON.stringify(OLD));
-  let p = await (await b.newContext({ acceptDownloads: true })).newPage();
+  // 轉檔工具依瀏覽器語言顯示：英文環境先檢查一次介面，再用中文環境做轉檔
+  const pe = await (await b.newContext({ locale: 'en-US' })).newPage();
+  await pe.goto('file://' + path.join(ROOT, 'tools/convert.html'));
+  const enText = await pe.innerText('body');
+  check('轉檔工具：英文環境只顯示英文', /Convert & download/.test(enText) && !/轉換/.test(enText), enText.slice(0, 80));
+  let p = await (await b.newContext({ acceptDownloads: true, locale: 'zh-TW' })).newPage();
+  check('轉檔工具：中文環境只顯示中文', await p.goto('file://' + path.join(ROOT, 'tools/convert.html')).then(() => p.innerText('body')).then((t) => /轉換並下載/.test(t) && !/Convert/.test(t)));
   await p.goto('file://' + path.join(ROOT, 'tools/convert.html'));
   const auto = p.waitForEvent('download', { timeout: 3000 }).catch(() => null);
   await p.setInputFiles('input[type=file]', path.join(TMP, 'old.json'));

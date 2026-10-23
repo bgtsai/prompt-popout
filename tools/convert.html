@@ -1,32 +1,31 @@
 <!doctype html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Prompt Popout 轉檔工具 / Converter</title>
+<title>Prompt Popout Converter</title>
 <style>
   :root { --bg:#fafafa; --fg:#1f1f1f; --muted:#666; --card:#fff; --border:#ddd; --accent:#d97757; }
   @media (prefers-color-scheme: dark) { :root { --bg:#1e1e1e; --fg:#eee; --muted:#aaa; --card:#2a2a2a; --border:#444; } }
   body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
   main { max-width:680px; margin:0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; }
-  h1 { font-size:20px; margin:0 0 8px; }
-  p.note { color:var(--muted); font-size:14px; margin:0 0 16px; }
-  button { font:inherit; padding:6px 16px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+  h1 { font-size:22px; margin:0 0 8px; }
+  p.note { color:var(--muted); margin:0 0 16px; }
+  button { font:inherit; height:36px; padding:0 14px; border-radius:10px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
   button:disabled { opacity:.4; cursor:default; }
   .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
   #out { white-space:pre-wrap; font-size:15px; }
   .err { color:#d0302f; }
-  .tag { display:inline-block; border-radius:999px; padding:0 9px; margin:2px; font-size:13px; background:#7071fc; color:#fff; }
+  .tag { display:inline-block; border-radius:999px; padding:2px 12px; margin:2px; background:#7071fc; color:#fff; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Prompt Popout 轉檔工具 / Converter</h1>
-  <p class="note">把舊工具匯出的 JSON 轉成 Prompt Popout 可匯入的格式。全程在本機處理，不連網。<br>
-  Converts a JSON export from the old tool into a file Prompt Popout can import. Runs entirely offline.</p>
+  <h1 data-t="title"></h1>
+  <p class="note" data-t="note"></p>
   <div class="row">
     <input type="file" id="file" accept=".json,application/json">
-    <button id="go" disabled>轉換並下載 / Convert &amp; download</button>
+    <button id="go" disabled data-t="go"></button>
   </div>
   <div id="out"></div>
 </main>
@@ -35,7 +34,43 @@
   'use strict';
   var DEFAULT_BG = '#7071fc';
   var DEFAULT_FG = '#ffffff';
-  var UNTITLED = '(無標題)';
+  // 介面語言跟腳本一致：瀏覽器語言是中文就顯示繁中，其他一律英文，不提供切換
+  var I18N = {
+    zh: {
+      title: 'Prompt Popout 轉檔工具',
+      note: '把舊工具匯出的 JSON 轉成 Prompt Popout 可匯入的格式。全程在本機處理，不連網。',
+      go: '轉換並下載',
+      untitled: '(無標題)',
+      notArray: '檔案內容不是 JSON 陣列',
+      badJson: '不是有效的 JSON',
+      readFail: '讀檔失敗',
+      failed: '轉換失敗：',
+      converted: function (n) { return '轉換了 ' + n + ' 筆提示詞'; },
+      skipped: function (n) { return '略過 ' + n + ' 筆（缺少內容）'; },
+      tags: function (n) { return '建立了 ' + n + ' 個標籤' + (n ? '：' : ''); },
+      next: '接著到 Prompt Popout 的「管理…」→「匯入」選擇剛下載的檔案。'
+    },
+    en: {
+      title: 'Prompt Popout converter',
+      note: 'Converts a JSON export from the old tool into a file Prompt Popout can import. Runs entirely offline.',
+      go: 'Convert & download',
+      untitled: '(Untitled)',
+      notArray: 'The file is not a JSON array',
+      badJson: 'Not valid JSON',
+      readFail: 'Could not read the file',
+      failed: 'Conversion failed: ',
+      converted: function (n) { return 'Converted ' + n + ' prompt(s)'; },
+      skipped: function (n) { return 'Skipped ' + n + ' (no content)'; },
+      tags: function (n) { return 'Created ' + n + ' tag(s)' + (n ? ':' : ''); },
+      next: 'Then in Prompt Popout open Manage… → Import and pick the downloaded file.'
+    }
+  };
+  var ZH = /^zh/i.test(navigator.language || '');
+  var T = ZH ? I18N.zh : I18N.en;
+  document.documentElement.lang = ZH ? 'zh-TW' : 'en';
+  document.title = T.title;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (el) { el.textContent = T[el.getAttribute('data-t')]; });
+  var UNTITLED = T.untitled;
   var fileIn = document.getElementById('file');
   var goBtn = document.getElementById('go');
   var out = document.getElementById('out');
@@ -49,7 +84,7 @@
 
   // 舊格式 → 新格式；只保留規格列出的欄位，其他（如 usageCount）捨棄
   function convert(old) {
-    if (!Array.isArray(old)) throw new Error('檔案內容不是 JSON 陣列 / Not a JSON array');
+    if (!Array.isArray(old)) throw new Error(T.notArray);
     var tags = [];
     var byLower = {};
     var prompts = [];
@@ -99,20 +134,19 @@
     out.className = '';
     var p = res.data.prompts.length, t = res.data.tags;
     out.appendChild(document.createTextNode(
-      '轉換了 ' + p + ' 筆提示詞 / Converted ' + p + ' prompt(s)' +
-      (res.skipped ? '\n略過 ' + res.skipped + ' 筆（缺 text）/ Skipped ' + res.skipped + ' (missing text)' : '') +
-      '\n建立了 ' + t.length + ' 個標籤 / Created ' + t.length + ' tag(s)' + (t.length ? '：' : '') + '\n'));
+      T.converted(p) + (res.skipped ? '\n' + T.skipped(res.skipped) : '') + '\n' + T.tags(t.length) + '\n'));
     t.forEach(function (tag) {
       var s = document.createElement('span');
       s.className = 'tag';
       s.textContent = tag.name;
       out.appendChild(s);
     });
+    out.appendChild(document.createTextNode('\n\n' + T.next));
   }
 
   function showError(msg) {
     out.className = 'err';
-    out.textContent = '轉換失敗 / Conversion failed：' + msg;
+    out.textContent = T.failed + msg;
   }
 
   fileIn.addEventListener('change', function () {
@@ -127,7 +161,7 @@
     reader.onload = function () {
       try {
         var json;
-        try { json = JSON.parse(reader.result); } catch (e) { throw new Error('不是有效的 JSON / Invalid JSON'); }
+        try { json = JSON.parse(reader.result); } catch (e) { throw new Error(T.badJson); }
         var res = convert(json);
         download(res.data);
         showResult(res);
@@ -138,7 +172,7 @@
     };
     reader.onerror = function () {
       console.error('[PromptPopout]', reader.error);
-      showError('讀檔失敗 / Could not read file');
+      showError(T.readFail);
     };
     reader.readAsText(f, 'utf-8');
   });
