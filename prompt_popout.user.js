@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name               Prompt Popout
 // @namespace          https://github.com/bgtsai
-// @version            1.1.0
+// @version            1.1.1
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
@@ -113,6 +113,7 @@
       fieldTitle: '標題',
       fieldText: '內容',
       fillHelp: '例如：翻成[語言::英文]',
+      fillNote: '預設開啟。提示詞本來就有中括號（例如 Markdown 連結 [文字](網址)）時請取消，避免被誤當成欄位。',
       helpLink: '詳細說明',
       tagsIntro: '標籤用來分類提示詞，在彈出清單上方點選即可篩選。',
       help: {
@@ -184,6 +185,7 @@
       fieldTitle: 'Title',
       fieldText: 'Content',
       fillHelp: 'e.g. Translate into [language::English]',
+      fillNote: 'On by default. Turn it off if the prompt itself contains square brackets (e.g. Markdown links [text](url)) so they are not taken as fields.',
       helpLink: 'Details',
       tagsIntro: 'Tags group your prompts; click them at the top of the pop-out list to filter.',
       help: {
@@ -1272,7 +1274,8 @@
     const textIn = h('textarea', { class: 'pp-mono' });
     textIn.value = existing ? existing.text : '';
     const fillCb = h('input', { type: 'checkbox' });
-    fillCb.checked = !!(existing && existing.fill);
+    // 新增時預設勾選（使用者要求）：寫了 [欄位] 卻忘了勾，會整段原樣送出、填空形同沒作用。既有提示詞維持原設定。
+    fillCb.checked = existing ? !!existing.fill : true;
     const sendCb = h('input', { type: 'checkbox' });
     sendCb.checked = !!(existing && existing.autoSend);
     const tagCbs = tags.map((t) => {
@@ -1285,6 +1288,7 @@
       h('div', { class: 'pp-field' }, h('div', { class: 'pp-label-row' }, h('label', { class: 'pp-label', text: T.fieldText })), textIn),
       // 勾選框與「詳細說明」並列：連結不可放進 <label> 裡，否則點連結會順便切換勾選
       h('div', { class: 'pp-check-row' }, h('label', { class: 'pp-check' }, fillCb, T.useFill), h('span', { class: 'pp-hint', style: 'margin-left:0', text: T.fillHelp }), helpLink('fill')),
+      h('div', { class: 'pp-help', style: 'margin:0 0 6px 26px', text: T.fillNote }),
       h('div', { class: 'pp-check-row' }, h('label', { class: 'pp-check' }, sendCb, T.autoSend), helpLink('autoSend')),
       h('div', { class: 'pp-field', style: 'margin-top:10px' },
         h('div', { class: 'pp-label-row' }, h('span', { class: 'pp-label', text: T.tagsLabel }), helpLink('tags')),

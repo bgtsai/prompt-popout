@@ -253,6 +253,7 @@ async function runSite(engineName, browser, site) {
   await sleep(300);
   const after = await page.evaluate(() => __store['pp.prompts']);
   check(`${tag} 新增後存進 pp.prompts`, after.length === before3 + 1 && after[after.length - 1].title === 'New one' && typeof after[after.length - 1].id === 'string', after[after.length - 1]);
+  check(`${tag} 新增提示詞預設勾選使用填空`, after[after.length - 1].fill === true, after[after.length - 1].fill);
   const keys = await page.evaluate(() => Object.keys(__store).sort());
   check(`${tag} 只用 pp.prompts／pp.tags 兩個鍵`, JSON.stringify(keys) === '["pp.prompts","pp.tags"]', keys);
   // 鍵盤事件不冒泡到網站
