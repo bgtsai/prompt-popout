@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name               Prompt Popout
 // @namespace          https://github.com/bgtsai
-// @version            1.1.1
+// @version            1.2.0
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
@@ -116,6 +116,8 @@
       fillNote: '預設開啟。提示詞本來就有中括號（例如 Markdown 連結 [文字](網址)）時請取消，避免被誤當成欄位。',
       helpLink: '詳細說明',
       tagsIntro: '標籤用來分類提示詞，在彈出清單上方點選即可篩選。',
+      needTagFirst: '要先建立標籤，才能勾選。',
+      newTagBtn: '新增標籤…',
       help: {
         fill: {
           title: '填空',
@@ -188,6 +190,8 @@
       fillNote: 'On by default. Turn it off if the prompt itself contains square brackets (e.g. Markdown links [text](url)) so they are not taken as fields.',
       helpLink: 'Details',
       tagsIntro: 'Tags group your prompts; click them at the top of the pop-out list to filter.',
+      needTagFirst: 'Create a tag first, then you can tick it here.',
+      newTagBtn: 'New tag…',
       help: {
         fill: {
           title: 'Fill-in fields',
@@ -1257,7 +1261,7 @@
     const footer = h('div', { style: 'display:contents' },
       h('button', { type: 'button', class: 'pp-btn', text: T.importBtn, onclick: doImport }),
       h('button', { type: 'button', class: 'pp-btn', text: T.exportBtn, onclick: doExport }),
-      h('button', { type: 'button', class: 'pp-btn', text: T.tagsBtn, onclick: showTagManager }),
+      h('button', { type: 'button', class: 'pp-btn', text: T.tagsBtn, onclick: () => showTagManager() }),
       h('span', { class: 'pp-spacer' }),
       h('button', { type: 'button', class: 'pp-btn pp-btn-primary', text: T.addBtn, onclick: () => showEditor(null) }),
       h('button', { type: 'button', class: 'pp-btn', text: T.close, onclick: () => close() }));
@@ -1268,7 +1272,6 @@
 
   function showEditor(id) {
     const existing = id ? getPrompts().find((p) => p.id === id) : null;
-    const tags = getTags();
     const titleIn = h('input', { type: 'text' });
     titleIn.value = existing ? existing.title : '';
     const textIn = h('textarea', { class: 'pp-mono' });
@@ -1278,11 +1281,23 @@
     fillCb.checked = existing ? !!existing.fill : true;
     const sendCb = h('input', { type: 'checkbox' });
     sendCb.checked = !!(existing && existing.autoSend);
-    const tagCbs = tags.map((t) => {
-      const cb = h('input', { type: 'checkbox' });
-      cb.checked = !!(existing && (existing.tagIds || []).includes(t.id));
-      return { t, cb };
-    });
+    // 標籤勾選區做成可重繪：在編輯頁按「新增標籤…」建完回來，新標籤要直接出現，已勾的狀態要保留
+    const checkedTagIds = new Set(existing ? (existing.tagIds || []) : []);
+    let tagCbs = [];
+    const tagArea = h('div');
+    const renderTagArea = () => {
+      tagArea.textContent = '';
+      const tags = getTags();
+      tagCbs = tags.map((t) => {
+        const cb = h('input', { type: 'checkbox' });
+        cb.checked = checkedTagIds.has(t.id);
+        cb.addEventListener('change', () => { if (cb.checked) checkedTagIds.add(t.id); else checkedTagIds.delete(t.id); });
+        return { t, cb };
+      });
+      if (!tags.length) tagArea.appendChild(h('div', { class: 'pp-help', style: 'margin:0', text: T.needTagFirst }));
+      else tagArea.appendChild(h('div', { class: 'pp-taglist' }, tagCbs.map(({ t, cb }) => h('label', { class: 'pp-check' }, cb, tagPill(t)))));
+    };
+    renderTagArea();
     const body = h('div', null,
       h('div', { class: 'pp-field' }, h('div', { class: 'pp-label-row' }, h('label', { class: 'pp-label', text: T.fieldTitle })), titleIn),
       h('div', { class: 'pp-field' }, h('div', { class: 'pp-label-row' }, h('label', { class: 'pp-label', text: T.fieldText })), textIn),
@@ -1291,9 +1306,9 @@
       h('div', { class: 'pp-help', style: 'margin:0 0 6px 26px', text: T.fillNote }),
       h('div', { class: 'pp-check-row' }, h('label', { class: 'pp-check' }, sendCb, T.autoSend), helpLink('autoSend')),
       h('div', { class: 'pp-field', style: 'margin-top:10px' },
-        h('div', { class: 'pp-label-row' }, h('span', { class: 'pp-label', text: T.tagsLabel }), helpLink('tags')),
-        tags.length ? null : h('div', { class: 'pp-help', style: 'margin:0', text: T.noTags }),
-        h('div', { class: 'pp-taglist' }, tagCbs.map(({ t, cb }) => h('label', { class: 'pp-check' }, cb, tagPill(t))))));
+        h('div', { class: 'pp-label-row' }, h('span', { class: 'pp-label', text: T.tagsLabel }), helpLink('tags'),
+          h('button', { type: 'button', class: 'pp-btn', text: T.newTagBtn, onclick: () => showTagManager(renderTagArea) })),
+        tagArea));
     const save = async () => {
       const text = textIn.value;
       if (!text.trim()) { await showMessage(T.emptyText); textIn.focus(); return; }
@@ -1303,7 +1318,7 @@
         text,
         fill: fillCb.checked,
         autoSend: sendCb.checked,
-        tagIds: tagCbs.filter((x) => x.cb.checked).map((x) => x.t.id),
+        tagIds: tagCbs.filter((x) => x.cb.checked).map((x) => x.t.id),  // 只存仍存在的標籤
       };
       const arr = getPrompts();
       const idx = arr.findIndex((p) => p.id === rec.id);
@@ -1321,7 +1336,8 @@
     titleIn.focus();
   }
 
-  function showTagManager() {
+  // onClosed：從編輯頁開啟時，關閉後讓編輯頁重繪標籤勾選區
+  function showTagManager(onClosed) {
     const list = h('div');
     const nameIn = h('input', { type: 'text', placeholder: T.newTagPlaceholder, style: 'flex:1' });
     const updateTag = (id, patch) => {
@@ -1370,11 +1386,11 @@
     };
     nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); } });
     const body = h('div', null,
-      h('div', { class: 'pp-help', style: 'margin:0 0 8px' }, T.tagsIntro, ' ', helpLink('tags')),
+      h('div', { class: 'pp-help', style: 'margin:0 0 8px' }, T.tagsIntro),
       list,
       h('div', { style: 'display:flex;gap:8px;margin-top:12px' }, nameIn,
         h('button', { type: 'button', class: 'pp-btn', text: T.addBtn, onclick: add })));
-    const done = () => { dlg.close(); if (managerRefresh) managerRefresh(); };
+    const done = () => { dlg.close(); if (managerRefresh) managerRefresh(); if (typeof onClosed === 'function') onClosed(); };
     const dlg = openDialog({ title: T.tagsTitle, body, onCancel: done, buttons: [{ text: T.close, onClick: done }] });
     refresh();
   }

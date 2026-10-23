@@ -161,6 +161,30 @@ async function runSite(engineName, browser, site) {
   // Esc 關閉
   await page.keyboard.press('Escape'); await sleep(100);
   check(`${tag} Esc 關閉`, !(await menuState(page)));
+  // 編輯頁：沒有標籤時提示先建立；「新增標籤…」建完回來，新標籤出現、已輸入內容不遺失
+  const tagFlow = await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const btn = (re) => [...document.querySelectorAll('#pp-root button')].filter((x) => x.offsetParent).reverse().find((x) => re.test(x.innerText.trim()));
+    __menu.find(([n]) => /管理|Manage/.test(n))[1](); await wait(80);
+    btn(/^(新增|Add)$/).click(); await wait(80);
+    const ed = [...document.querySelectorAll('#pp-root .pp-dialog')].pop();
+    const hint = /要先建立標籤/.test(ed.innerText);
+    ed.querySelector('input[type=text]').value = 'keep me';
+    btn(/^新增標籤…$/).click(); await wait(80);
+    const tm = [...document.querySelectorAll('#pp-root .pp-dialog')].pop();
+    const noHelpInTagPage = !tm.querySelector('.pp-link');
+    const inp = [...tm.querySelectorAll('input[type=text]')].pop(); inp.value = 'NewTag';
+    [...tm.querySelectorAll('button')].find((b) => /^(新增|Add)$/.test(b.innerText.trim())).click(); await wait(50);
+    [...tm.querySelectorAll('button')].find((b) => /^(關閉|Close)$/.test(b.innerText.trim())).click(); await wait(80);
+    const after = ed.innerText;
+    const res = { hint, noHelpInTagPage, tagShown: /NewTag/.test(after) && !!ed.querySelector('.pp-taglist input[type=checkbox]'), kept: ed.querySelector('input[type=text]').value, editorHelp: ed.querySelectorAll('.pp-link').length };
+    document.querySelectorAll('#pp-root .pp-overlay').forEach((o) => o.remove());
+    return res;
+  });
+  check(`${tag} 編輯頁無標籤時提示先建立`, tagFlow.hint);
+  check(`${tag} 標籤管理頁沒有詳細說明`, tagFlow.noHelpInTagPage);
+  check(`${tag} 編輯頁新增標籤後直接出現且內容保留`, tagFlow.tagShown && tagFlow.kept === 'keep me', tagFlow);
+  check(`${tag} 編輯頁仍有 3 個詳細說明`, tagFlow.editorHelp === 3, tagFlow.editorHelp);
   check(`${tag} 無頁面錯誤（空資料）`, errors.length === 0, errors.slice(0, 3));
   await ctx.close();
 
