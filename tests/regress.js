@@ -121,7 +121,7 @@ const SAMPLE = {
 async function runSite(engineName, browser, site) {
   const tag = `[${engineName}/${site}]`;
   // ── 1. 空資料：把手外觀與清單空狀態
-  let { ctx, page, errors } = await setup(browser, site, {});
+  let { ctx, page, errors } = await setup(browser, site, { 'pp.prompts': [], 'pp.tags': [] });
   const before = { right: 1100 - 120 };
   const cb = await cardBox(page);
   const radius = site === 'claude' ? 16 : site === 'chatgpt' ? 28 : 24;
@@ -327,6 +327,22 @@ async function runSite(engineName, browser, site) {
   await page.mouse.move(c3.left + radius, (c3.top + c3.bottom) / 2); await sleep(450);
   m = await menuState(page);
   check(`${tag} 英文介面`, m && !/還沒有/.test(m.text) && /[A-Za-z]/.test(m.text), m && m.text);
+  // 第一次安裝（儲存完全沒寫過）放入範例：英文環境英文範例；標籤有的一個、有的兩個、有的沒有
+  const seedEn = await page.evaluate(() => ({ p: __store['pp.prompts'], t: __store['pp.tags'] }));
+  const tagCounts = seedEn.p.map((x) => x.tagIds.length);
+  check(`${tag} 第一次安裝放入英文範例`, seedEn.p.length === 6 && seedEn.t.length === 3 && /Translate/.test(seedEn.p[0].title), seedEn.p.map((x) => x.title));
+  check(`${tag} 範例標籤有 0、1、2 個的提示詞`, tagCounts.includes(0) && tagCounts.includes(1) && tagCounts.includes(2), tagCounts);
+  check(`${tag} 範例同時示範填空與自動送出`, seedEn.p.some((x) => x.fill) && seedEn.p.some((x) => x.autoSend) && seedEn.p.some((x) => x.fill && x.autoSend));
+  check(`${tag} 範例標籤 id 都對得上`, seedEn.p.every((x) => x.tagIds.every((id) => seedEn.t.some((t) => t.id === id))));
+  await ctx.close();
+
+  // 中文環境放中文範例；已有空陣列（使用者刪光過）時不再補回
+  ({ ctx, page, errors } = await setup(browser, site, {}));
+  const seedZh = await page.evaluate(() => __store['pp.prompts'].map((x) => x.title));
+  check(`${tag} 第一次安裝放入中文範例`, seedZh.length === 6 && /翻成/.test(seedZh[0]), seedZh);
+  await ctx.close();
+  ({ ctx, page, errors } = await setup(browser, site, { 'pp.prompts': [], 'pp.tags': [] }));
+  check(`${tag} 刪光後不會再放範例`, await page.evaluate(() => __store['pp.prompts'].length === 0 && __store['pp.tags'].length === 0));
   await ctx.close();
 }
 

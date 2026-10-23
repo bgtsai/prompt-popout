@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name               Prompt Popout
 // @namespace          https://github.com/bgtsai
-// @version            1.2.2
+// @version            1.3.0
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
@@ -1467,7 +1467,54 @@
 
   // ───────────────────────── 啟動 ─────────────────────────
 
+
+  // ───────────────────────── 第一次安裝的範例 ─────────────────────────
+  // 讓新使用者一打開就看得到填空、自動送出、標籤實際長什麼樣（使用者要求）。
+  // 標籤刻意設計成：有的提示詞一個標籤、有的兩個、有的沒有，篩選才看得出效果。
+  // 文字中的 {tag:鍵} 只是本段內部用來對應標籤的代號，寫入時換成真正的 id。
+  const SEED = {
+    'zh-TW': {
+      tags: [['tr', '翻譯', '#5b7cfa'], ['wr', '寫作', '#d97757'], ['code', '程式', '#2f9e6e']],
+      prompts: [
+        ['翻成[語言]', '把下面這段翻成[語言::英文]，語氣要[語氣](例如：正式、輕鬆)：', true, false, ['tr']],
+        ['改用[語言]回答', '接下來請一律用[語言::英文]回答我。', true, true, ['tr']],
+        ['潤飾後翻成英文', '先幫我潤飾下面這段中文，再翻成英文，兩個版本都列出來：', false, false, ['tr', 'wr']],
+        ['校對錯字', '幫我找出下面這段的錯字和語病，列出原句和建議改法：', false, false, ['wr']],
+        ['解釋程式碼', '用[程度::初學者]看得懂的方式，逐行解釋下面的[程式語言::JavaScript]程式碼：', true, false, ['code']],
+        ['總結這段對話', '用三點整理我們到目前為止的對話重點。', false, true, []],
+      ],
+    },
+    en: {
+      tags: [['tr', 'Translate', '#5b7cfa'], ['wr', 'Writing', '#d97757'], ['code', 'Code', '#2f9e6e']],
+      prompts: [
+        ['Translate to [language]', 'Translate the text below into [language::English], in a [tone](e.g. formal, casual) tone:', true, false, ['tr']],
+        ['Reply in [language]', 'From now on, please reply to me in [language::English].', true, true, ['tr']],
+        ['Polish, then translate', 'First polish the text below, then translate it into Spanish. Show both versions:', false, false, ['tr', 'wr']],
+        ['Proofread', 'Find the typos and awkward phrasing in the text below. List each original sentence with a suggested fix:', false, false, ['wr']],
+        ['Explain code', 'Explain the [language::JavaScript] code below line by line, for a [level::beginner]:', true, false, ['code']],
+        ['Summarise the chat', 'Summarise our conversation so far in three bullet points.', false, true, []],
+      ],
+    },
+  };
+
+  // 只在兩個儲存鍵都「從來沒寫過」時放入：使用者把範例全刪掉後是空陣列，不會被補回來；已有資料的人不受影響
+  function seedIfFirstRun() {
+    try {
+      if (GM_getValue(STORE_PROMPTS, null) !== null || GM_getValue(STORE_TAGS, null) !== null) return;
+      const seed = /^zh/i.test(navigator.language || '') ? SEED['zh-TW'] : SEED.en;
+      const ids = {};
+      const tags = seed.tags.map(([key, name, bg]) => { ids[key] = newId(); return { id: ids[key], name, bg, fg: '#ffffff' }; });
+      const prompts = seed.prompts.map(([title, text, fill, autoSend, keys]) => ({ id: newId(), title, text, fill, autoSend, tagIds: keys.map((k) => ids[k]) }));
+      setTags(tags);
+      setPrompts(prompts);
+      log('第一次使用，已放入範例提示詞');
+    } catch (e) {
+      warn('放入範例失敗', e);
+    }
+  }
+
   function init() {
+    seedIfFirstRun();
     injectStyle();
     getRoot();
     document.addEventListener('mousemove', onMouseMove, { passive: true, capture: true });

@@ -14,6 +14,7 @@ Keep the prompts you use all the time one hover away. Prompt Popout puts a slim 
 - **Auto-send** — optionally hit send for you once the text is in.
 - **Tags** — sort prompts with coloured tags and click a tag at the top of the list to show just those. Pick several and you'll only see prompts that have all of them.
 - **Import / export** — back up your prompts, or move them to another computer, as a JSON file.
+- **Samples to start with** — a fresh install comes with six sample prompts and three tags (Translate, Writing, Code), so you can try fill-in blanks, auto-send and tag filtering right away. Edit or delete them as you like; they won't come back.
 - **Built-in help** — *Details* links in the editor show, with examples, how fill-in blanks and auto-send work.
 - The interface follows your browser's language: Traditional Chinese for Chinese, English for everything else.
 
