@@ -159,7 +159,7 @@ async function runSite(engineName, browser, site) {
     check(`${tag} 清單寬 320`, Math.abs(m.width - 320) < 1, m.width);
     check(`${tag} 清單在把手右側 (卡片左+W+4)`, Math.abs(m.left - (cb.left + W + 4)) < 1.5, { left: m.left, expected: cb.left + W + 4 });
     check(`${tag} 空狀態文字`, /還沒有提示詞/.test(m.text), m.text);
-    const ACTIVE = { claude: 'rgb(217, 119, 87)', chatgpt: 'rgb(0, 0, 0)', gemini: 'rgb(11, 87, 208)' }[site];
+    const ACTIVE = { claude: 'rgb(217, 119, 87)', chatgpt: 'rgb(58, 131, 247)', gemini: 'rgb(0, 0, 0)' }[site];
     check(`${tag} 燈條變該站主色`, (await cardBox(page)).afterBg === ACTIVE, (await cardBox(page)).afterBg);
     if (SHOT_DIR && site === 'claude') await page.screenshot({ path: path.join(SHOT_DIR, `${engineName}_${site}_open_empty.png`), clip: { x: cb.left - 10, y: cb.top - 20, width: 420, height: 200 } });
   }

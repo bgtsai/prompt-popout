@@ -2,7 +2,7 @@
 // @name               Prompt Popout
 // @name:zh-TW         Prompt Popout 提示詞快選
 // @namespace          https://github.com/bgtsai
-// @version            1.4.0
+// @version            1.4.1
 // @author             bgtsai
 // @description        Adds a handle to the left of AI chat inputs; hover it to pop out your saved prompts and click one to insert it.
 // @description:zh-TW  在 AI 聊天輸入框左側加一個把手，滑過即彈出已存的提示詞清單，點選即填入。
@@ -43,8 +43,8 @@
   // Claude 陶土橘；ChatGPT 主色是黑（深色主題反過來用白，否則黑底看不到）；Gemini 沒有明顯主色，用 Google 藍（深色主題用淺藍）
   const SITE_ACTIVE_COLOR = {
     claude: { light: '#d97757', dark: '#d97757' },
-    chatgpt: { light: '#000000', dark: '#ffffff' },
-    gemini: { light: '#0b57d0', dark: '#a8c7fa' },
+    chatgpt: { light: '#3a83f7', dark: '#3a83f7' },  // 取自 ChatGPT 語音鈕的藍（使用者截圖量測 rgb(58,131,247)）
+    gemini: { light: '#000000', dark: '#ffffff' },   // 深色頁面黑色看不見，改用白
   };
 
   const CARD_SEARCH_MAX_DEPTH = 12;          // 從輸入框往上找卡片的最大層數
